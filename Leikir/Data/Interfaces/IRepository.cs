@@ -21,9 +21,9 @@ public interface IRepository
   
   //Score
   
-  Task<List<ScoreDTO>> GetAllScores();
+  Task<List<ScoreDTO>> GetAllScoresAsync();
   
-  Task<ScoreDTO> GetAllScoresByUserId(int id);
+  Task<ScoreDTO> GetAllScoresByUserIdAsync(int id);
   
   Task<ScoreDTO> UpdateScoreAsync(int id, ScoreDTO score);
   
@@ -32,9 +32,9 @@ public interface IRepository
   
   //Game
   
-  Task<List<GameReadDTO>> GetAllGames();
+  Task<List<GameReadDTO>> GetAllGamesAsync();
   
-  Task<GameReadDTO> GetGameById(int id);
+  Task<GameReadDTO> GetGameByIdAsync(int id);
   
   Task CreateGameAsync(GameCreateDTO game);
   

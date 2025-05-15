@@ -128,7 +128,7 @@ public class LeikirRepository : IRepository
         }
     }
 
-    public async Task<List<ScoreDTO>> GetAllScores()
+    public async Task<List<ScoreDTO>> GetAllScoresAsync()
     {
         List<Score> scores;
 
@@ -154,7 +154,7 @@ public class LeikirRepository : IRepository
         return result;
     }
 
-    public async Task<ScoreDTO> GetAllScoresByUserId(int id)
+    public async Task<ScoreDTO> GetAllScoresByUserIdAsync(int id)
     {
         Score? s;
 
@@ -225,7 +225,7 @@ public class LeikirRepository : IRepository
         }
     }
 
-    public async Task<List<GameReadDTO>> GetAllGames()
+    public async Task<List<GameReadDTO>> GetAllGamesAsync()
     {
         List<Game> games;
         
@@ -250,7 +250,7 @@ public class LeikirRepository : IRepository
         return result;
     }
 
-    public async Task<GameReadDTO> GetGameById(int id)
+    public async Task<GameReadDTO> GetGameByIdAsync(int id)
     {
         Game? g;
 
