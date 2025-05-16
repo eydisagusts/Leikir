@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "BuHPKBHB4Vk=",
+  "dgSpecHash": "SV0GqYfrRxY=",
   "success": true,
   "projectFilePath": "/Users/eydisla/Desktop/Leikir/Leikir/Leikir.csproj",
   "expectedPackageFiles": [
+    "/Users/eydisla/.nuget/packages/bcrypt.net-next/4.0.3/bcrypt.net-next.4.0.3.nupkg.sha512",
     "/Users/eydisla/.nuget/packages/humanizer.core/2.14.1/humanizer.core.2.14.1.nupkg.sha512",
     "/Users/eydisla/.nuget/packages/microsoft.aspnetcore.jsonpatch/8.0.5/microsoft.aspnetcore.jsonpatch.8.0.5.nupkg.sha512",
     "/Users/eydisla/.nuget/packages/microsoft.aspnetcore.mvc.newtonsoftjson/8.0.5/microsoft.aspnetcore.mvc.newtonsoftjson.8.0.5.nupkg.sha512",

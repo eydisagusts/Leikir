@@ -156,3 +156,9 @@
 /Users/eydisla/Desktop/Leikir/Leikir/obj/Debug/net8.0/Leikir.pdb
 /Users/eydisla/Desktop/Leikir/Leikir/obj/Debug/net8.0/Leikir.genruntimeconfig.cache
 /Users/eydisla/Desktop/Leikir/Leikir/obj/Debug/net8.0/ref/Leikir.dll
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Microsoft.AspNetCore.JsonPatch.dll
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Microsoft.AspNetCore.Mvc.NewtonsoftJson.dll
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Newtonsoft.Json.dll
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Newtonsoft.Json.Bson.dll
+/Users/eydisla/Desktop/Leikir/Leikir/obj/Debug/net8.0/Leikir.sourcelink.json
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/BCrypt.Net-Next.dll

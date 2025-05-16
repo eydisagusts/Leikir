@@ -15,12 +15,14 @@ public class User
     public string Username { get; set; }
     
     [Required]
+    [EmailAddress]
     public string Email { get; set; }
     
     [Required]
     [MaxLength(256)]
-    [MinLength(6)]
-    public string Password { get; set; }
+    public string PasswordHash { get; set; }
+    
+    public int TotalScore { get; set; }
     
     public ICollection<Score> Scores { get; set; }
 }

@@ -10,5 +10,5 @@ public class UserReadDTO
     
     public string Email { get; set; } = null!;
     
-    public ICollection<Models.Score> Scores { get; set; } = null!;
+    public int TotalScore { get; set; }
 }

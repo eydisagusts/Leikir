@@ -12,5 +12,5 @@ public class UserDetailsDTO
     
     public string Email { get; set; } = null!;
     
-    public List<ScoreDTO> Scores { get; set; } = new();
+    public int TotalScore { get; set; }
 }

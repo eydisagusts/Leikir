@@ -50,6 +50,27 @@ public class ScoresController : ControllerBase
         }
     }
     
+    [HttpPost]
+    public async Task<IActionResult> CreateScore([FromBody] ScoreDTO score)
+    {
+        try
+        {
+            if (ModelState.IsValid)
+            {
+                await _repository.CreateScoreAsync(score);
+                return Ok(score);
+            }
+            else
+            {
+                return BadRequest(ModelState);
+            }
+        }
+        catch (Exception)
+        {
+            return StatusCode(500);
+        }
+    }
+    
     //Update
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateScore(int id, [FromBody] ScoreDTO score)

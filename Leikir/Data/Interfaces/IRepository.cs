@@ -25,6 +25,8 @@ public interface IRepository
   
   Task<ScoreDTO> GetAllScoresByUserIdAsync(int id);
   
+  Task CreateScoreAsync(ScoreDTO score);
+  
   Task<ScoreDTO> UpdateScoreAsync(int id, ScoreDTO score);
   
   Task<bool> DeleteScoreAsync(int id);

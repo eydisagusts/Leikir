@@ -5,6 +5,7 @@ using Leikir.Models.DTO.Score;
 using Leikir.Models.DTO.User;
 using Microsoft.EntityFrameworkCore;
 using User = Leikir.Models.User;
+using BCrypt.Net;
 
 namespace Leikir.Data.Repositories;
 
@@ -24,7 +25,9 @@ public class LeikirRepository : IRepository
 
         using (var db = _dbContext)
         {
-            users = await db.Users.ToListAsync();
+            users = await db.Users
+                .Include(u => u.Scores)
+                .ToListAsync();
         }
         
         List<UserReadDTO> result = new List<UserReadDTO>();
@@ -37,6 +40,7 @@ public class LeikirRepository : IRepository
             userToAdd.Name = user.Name;
             userToAdd.Username = user.Username;
             userToAdd.Email = user.Email;
+            userToAdd.TotalScore = user.Scores?.Sum(s => s.UserScore) ?? 0;
             
             result.Add(userToAdd);
         }
@@ -50,8 +54,13 @@ public class LeikirRepository : IRepository
 
         using (var db = _dbContext)
         {
-            u = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
+            u = await db.Users
+                .Include(u => u.Scores)
+                .FirstOrDefaultAsync(x => x.Id == id);
         }
+
+        if (u == null)
+            return null;
 
         UserDetailsDTO result = new UserDetailsDTO()
         {
@@ -59,6 +68,7 @@ public class LeikirRepository : IRepository
             Name = u.Name,
             Username = u.Username,
             Email = u.Email,
+            TotalScore = u.Scores?.Sum(s => s.UserScore) ?? 0
         };
         return result;
     }
@@ -72,7 +82,7 @@ public class LeikirRepository : IRepository
                 Name = user.Name,
                 Username = user.Username,
                 Email = user.Email,
-                Password = user.Password
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Password)
             };
             await db.Users.AddAsync(us);
             await db.SaveChangesAsync();
@@ -89,12 +99,12 @@ public class LeikirRepository : IRepository
             {
                 return null;
             }
-            
+
             userToUpdate.Name = user.Name;
             userToUpdate.Username = user.Username;
             userToUpdate.Email = user.Email;
-            userToUpdate.Password = user.Password;
-            
+            userToUpdate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Password);
+
             await db.SaveChangesAsync();
 
             return new UserReadDTO()
@@ -136,21 +146,22 @@ public class LeikirRepository : IRepository
         {
             scores = await db.Scores.ToListAsync();
         }
-        
+
         List<ScoreDTO> result = new List<ScoreDTO>();
 
         foreach (Score score in scores)
         {
             ScoreDTO scoreDto = new ScoreDTO();
-            
+
             scoreDto.Id = score.Id;
             scoreDto.UserId = score.UserId;
             scoreDto.GameId = score.GameId;
             scoreDto.UserScore = score.UserScore;
             scoreDto.AchivedAt = score.AchivedAt;
-            
+
             result.Add(scoreDto);
         }
+
         return result;
     }
 
@@ -162,7 +173,7 @@ public class LeikirRepository : IRepository
         {
             s = await db.Scores.FirstOrDefaultAsync(x => x.Id == id);
         }
-        
+
         if (s == null)
         {
             return null;
@@ -176,11 +187,27 @@ public class LeikirRepository : IRepository
             UserScore = s.UserScore,
             AchivedAt = s.AchivedAt
         };
-        
+
         return scoreDto;
     }
 
-    public async Task<ScoreDTO> UpdateScoreAsync(int id, ScoreDTO score)
+    public async Task CreateScoreAsync(ScoreDTO score)
+    {
+        using (var db = _dbContext)
+        {
+            Score s = new Score
+            {
+                UserId = score.UserId,
+                GameId = score.GameId,
+                UserScore = score.UserScore,
+                AchivedAt = score.AchivedAt
+            };
+            await db.Scores.AddAsync(s);
+            await db.SaveChangesAsync();
+        }
+    }
+
+public async Task<ScoreDTO> UpdateScoreAsync(int id, ScoreDTO score)
     {
         using (var db = _dbContext)
         {
