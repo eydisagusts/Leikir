@@ -1,5 +1,9 @@
+using Leikir.Data;
+using Leikir.Data.Games.Hangman;
+using Leikir.Data.Games.Wordle;
 using Leikir.Data.Interfaces;
 using Leikir.Data.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace Leikir;
 
@@ -19,6 +23,15 @@ public class Program
         builder.Services.AddControllersWithViews().AddNewtonsoftJson(options =>
             options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
         );
+
+        // Add DbContext
+        builder.Services.AddDbContext<LeikirContext>();
+
+        // Add game services
+        builder.Services.AddScoped<WordleGameService>();
+        builder.Services.AddScoped<HangmanGameService>();
+        builder.Services.AddSingleton<WordleWordValidator>();
+        builder.Services.AddSingleton<TargetWordList>();
 
         var app = builder.Build();
 

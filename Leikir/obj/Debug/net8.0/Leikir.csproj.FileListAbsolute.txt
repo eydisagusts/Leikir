@@ -162,3 +162,5 @@
 /Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Newtonsoft.Json.Bson.dll
 /Users/eydisla/Desktop/Leikir/Leikir/obj/Debug/net8.0/Leikir.sourcelink.json
 /Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/BCrypt.Net-Next.dll
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Data/Games/Words/Hangmen/target_words.json
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Data/Games/Words/Wordle/target_words.json
