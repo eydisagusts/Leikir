@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Leikir.Data.Games.Hangman;
 
@@ -17,8 +18,13 @@ public class TargetWordList
         _targetWords = new List<string>();
         _random = new Random();
         
+        // Get the application's base directory
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        
         // Set path relative to the application root
-        _targetWordsPath = Path.Combine("Data", "Games", "Words", "hangman", "target_words.json");
+        _targetWordsPath = Path.Combine(baseDir, "Data", "Games", "Words", "Hangmen", "target_words.json");
+        
+        Console.WriteLine($"Looking for target words at: {_targetWordsPath}");
         
         LoadWords();
     }
@@ -29,15 +35,30 @@ public class TargetWordList
         {
             if (File.Exists(_targetWordsPath))
             {
+                Console.WriteLine("Found target_words.json");
                 var json = File.ReadAllText(_targetWordsPath);
-                var targetWords = JsonSerializer.Deserialize<TargetWords>(json);
+                Console.WriteLine($"JSON content: {json}"); // Debug the JSON content
+                
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true // Make property name matching case-insensitive
+                };
+                
+                var targetWords = JsonSerializer.Deserialize<TargetWords>(json, options);
                 if (targetWords?.Words != null)
                 {
                     _targetWords.AddRange(targetWords.Words);
+                    Console.WriteLine($"Loaded {_targetWords.Count} target words");
+                    Console.WriteLine($"First few words: {string.Join(", ", _targetWords.Take(3))}"); // Debug the loaded words
+                }
+                else
+                {
+                    Console.WriteLine("No words found in target_words.json");
                 }
             }
             else
             {
+                Console.WriteLine($"Target words file not found at {_targetWordsPath}");
                 throw new FileNotFoundException($"Target words file not found at {_targetWordsPath}");
             }
         }
@@ -65,6 +86,7 @@ public class TargetWordList
 
     private class TargetWords
     {
+        [JsonPropertyName("words")]
         public List<string> Words { get; set; } = new();
     }
 }

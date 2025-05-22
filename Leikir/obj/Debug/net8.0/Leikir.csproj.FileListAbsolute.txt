@@ -164,3 +164,4 @@
 /Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/BCrypt.Net-Next.dll
 /Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Data/Games/Words/Hangmen/target_words.json
 /Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Data/Games/Words/Wordle/target_words.json
+/Users/eydisla/Desktop/Leikir/Leikir/bin/Debug/net8.0/Data/Games/Words/Wordle/valid_words.txt
