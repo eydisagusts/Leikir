@@ -1,0 +1,168 @@
+'use client';
+
+import React, { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
+
+export default function Header() {
+    const pathname = usePathname();
+    const router = useRouter();
+    const { user, logout } = useAuth();
+    const [mounted, setMounted] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Handle hydration mismatch
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const isActive = (path: string): boolean => {
+        if (!mounted) return false;
+        return pathname === path;
+    };
+
+    const handleLogout = (): void => {
+        logout();
+        setIsDropdownOpen(false);
+        router.push('/');
+    };
+
+    return (
+        <header className="bg-white shadow-md">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center h-16">
+                    <Link href="/" className="text-2xl font-bold text-black">
+                        Leikir
+                    </Link>
+
+                    <div className="flex-1 flex justify-center">
+                        <nav className="flex space-x-4">
+                            <Link
+                                href="/"
+                                className={`px-3 py-2 rounded-md text-lg font-medium ${
+                                    isActive('/') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                }`}
+                            >
+                                Heim
+                            </Link>
+                    
+                            <Link
+                                href="/leaderboard"
+                                className={`px-3 py-2 rounded-md text-lg font-medium ${
+                                    isActive('/stigatafla') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                }`}
+                            >
+                                Stigatafla
+                            </Link>
+                            <Link
+                                href="/about"
+                                className={`px-3 py-2 rounded-md text-lg font-medium ${
+                                    isActive('/umokkur') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                }`}
+                            >
+                                Um Okkur
+                            </Link>
+                            <Link
+                                href="/contact"
+                                className={`px-3 py-2 rounded-md text-lg font-medium ${
+                                    isActive('/samband') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                }`}
+                            >
+                                Hafa Samband
+                            </Link>
+                        </nav>
+                    </div>
+
+                    <div className="flex-shrink-0">
+                        {user ? (
+                            <div className="flex items-center space-x-4" ref={dropdownRef}>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-gray-700 font-medium">{user.username}</span>
+                                    <div className="flex items-center space-x-1 bg-gray-100 px-3 py-1 rounded-full">
+                                        <span className="text-gray-600">Stig:</span>
+                                        <span className="font-bold text-blue-600">{user.totalScore || 0}</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                        className="px-4 py-2 rounded-md text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                                    >
+                                        <span>Minn aðgangur</span>
+                                        <svg
+                                            className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {isDropdownOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                                            >
+                                                <div className="py-1">
+                                                    <Link
+                                                        href="/profile"
+                                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
+                                                        onClick={() => setIsDropdownOpen(false)}
+                                                    >
+                                                        Breyta prófíl
+                                                    </Link>
+                                                    <button
+                                                        onClick={handleLogout}
+                                                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-700 hover:text-white cursor-pointer"
+                                                    >
+                                                        Útskrá
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex space-x-4">
+                                <Link
+                                    href="/nyskraning"
+                                    className="px-4 py-2 rounded-md text-lg font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                                >
+                                    Nýskráning
+                                </Link>
+                                <Link
+                                    href="/innskraning"
+                                    className="px-4 py-2 rounded-md text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                                >
+                                    Innskráning
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </header>
+    );
+}

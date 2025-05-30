@@ -7,15 +7,16 @@ namespace Leikir.Data.Games.Wordle;
 
 public class WordleGameService : IGameService
 {
+    private const int MAX_ATTEMPTS = 6;
+    private const int WORD_LENGTH = 5;
     private readonly WordleWordValidator _wordValidator;
     private readonly LeikirContext _context;
-    private readonly Dictionary<int, WordleGameStateDto> _activeGames;
+    private static readonly Dictionary<int, WordleGameStateDto> _activeGames = new();
 
     public WordleGameService(WordleWordValidator wordValidator, LeikirContext context)
     {
         _wordValidator = wordValidator;
         _context = context;
-        _activeGames = new Dictionary<int, WordleGameStateDto>();
     }
 
     public async Task<ScoreDTO> StartNewGameAsync(int userId, int gameId)
@@ -76,7 +77,7 @@ public class WordleGameService : IGameService
         return null;
     }
 
-    public async Task<ScoreDTO> MakeAttemptAsync(int userId, int gameId, string guess)
+    public async Task<WordleGuessResponseDto> MakeAttemptAsync(int userId, int gameId, string guess)
     {
         // Get current game state
         if (!_activeGames.TryGetValue(userId, out var gameState))
@@ -92,6 +93,7 @@ public class WordleGameService : IGameService
 
         // Convert to uppercase for consistency
         guess = guess.ToUpper();
+        var targetWord = gameState.TargetWord;
 
         // Check if game is already over
         if (gameState.IsGameOver)
@@ -104,51 +106,79 @@ public class WordleGameService : IGameService
         gameState.NumberOfAttempts++;
 
         // Check if guess is correct
-        var isCorrect = guess == gameState.TargetWord;
+        var isCorrect = guess == targetWord;
         var letterStates = new List<LetterState>();
+        var targetWordChars = targetWord.ToCharArray();
 
         if (isCorrect)
         {
             // All letters are correct
-            letterStates.AddRange(Enumerable.Repeat(LetterState.Correct, 5));
+            letterStates.AddRange(Enumerable.Repeat(LetterState.Correct, WORD_LENGTH));
             gameState.IsGameOver = true;
             gameState.IsWon = true;
-            gameState.Score = CalculateScore(gameState.NumberOfAttempts);
-            gameState.CompletedAt = DateTime.UtcNow;
+
+            // Calculate score based on attempts and time
+            var timeInSeconds = (int)(DateTime.UtcNow - gameState.StartedAt).TotalSeconds;
+            gameState.Score = CalculateScore(gameState.NumberOfAttempts, timeInSeconds);
 
             // Save score to database
             await SaveScoreAsync(userId, gameId, gameState.Score);
         }
         else
         {
-            // Check each letter
-            for (int i = 0; i < 5; i++)
+            // Count occurrences of each letter in the target word
+            var letterCounts = new Dictionary<char, int>();
+            for (int i = 0; i < targetWordChars.Length; i++)
             {
-                if (guess[i] == gameState.TargetWord[i])
+                var letter = targetWordChars[i];
+                if (!letterCounts.ContainsKey(letter))
+                {
+                    letterCounts[letter] = 0;
+                }
+                letterCounts[letter]++;
+            }
+
+            // First pass: Mark correct letters
+            for (int i = 0; i < guess.Length; i++)
+            {
+                if (guess[i] == targetWordChars[i])
                 {
                     letterStates.Add(LetterState.Correct);
-                }
-                else if (gameState.TargetWord.Contains(guess[i]))
-                {
-                    letterStates.Add(LetterState.Present);
+                    letterCounts[guess[i]]--; // Decrease count for this letter
                 }
                 else
                 {
-                    letterStates.Add(LetterState.Absent);
+                    letterStates.Add(LetterState.Absent); // Temporary state
                 }
             }
 
-            // Check if game is over (max 6 attempts)
-            if (gameState.NumberOfAttempts >= 6)
+            // Second pass: Check for present letters
+            for (int i = 0; i < guess.Length; i++)
+            {
+                if (letterStates[i] == LetterState.Correct) continue; // Skip already correct letters
+
+                var letter = guess[i];
+                if (letterCounts.ContainsKey(letter) && letterCounts[letter] > 0)
+                {
+                    letterStates[i] = LetterState.Present;
+                    letterCounts[letter]--; // Decrease count for this letter
+                }
+                else
+                {
+                    letterStates[i] = LetterState.Absent;
+                }
+            }
+
+            // Check if game is over (max attempts reached)
+            if (gameState.NumberOfAttempts >= MAX_ATTEMPTS)
             {
                 gameState.IsGameOver = true;
                 gameState.IsWon = false;
-                gameState.CompletedAt = DateTime.UtcNow;
             }
         }
 
         // Create response with letter states for frontend
-        var response = new WordleGuessResponseDto
+        return new WordleGuessResponseDto
         {
             Guess = guess,
             LetterStates = letterStates,
@@ -156,16 +186,6 @@ public class WordleGameService : IGameService
             IsGameOver = gameState.IsGameOver,
             IsWon = gameState.IsWon,
             Score = gameState.Score
-        };
-
-        return new ScoreDTO
-        {
-            UserId = userId,
-            GameId = gameId,
-            UserScore = gameState.Score,
-            NumberOfAttempts = gameState.NumberOfAttempts,
-            GuessedWord = gameState.TargetWord,
-            AchivedAt = DateTime.UtcNow
         };
     }
 
@@ -179,10 +199,29 @@ public class WordleGameService : IGameService
         return await _wordValidator.GetRandomWordAsync();
     }
 
-    private int CalculateScore(int attempts)
+    private int CalculateScore(int attempts, int timeInSeconds)
     {
-        // Base score is 1000, reduced by 100 for each attempt
-        return Math.Max(1000 - (attempts - 1) * 100, 100);
+        int attemptsScore = attempts switch
+        {
+            1 => 100,
+            2 => 80,
+            3 => 60,
+            4 => 40,
+            5 => 30,
+            _ => 15
+        };
+
+        int timeScore = timeInSeconds switch
+        {
+            var t when t <= 60 => 100,
+            var t when t <= 180 => 80,
+            var t when t <= 300 => 60,
+            var t when t <= 480 => 40,
+            var t when t <= 600 => 30,
+            _ => 15
+        };
+        
+        return attemptsScore + timeScore;
     }
 
     private async Task SaveScoreAsync(int userId, int gameId, int score)
@@ -195,7 +234,17 @@ public class WordleGameService : IGameService
             AchivedAt = DateTime.UtcNow
         };
 
+        // Add score to Scores table
         _context.Scores.Add(scoreEntity);
+
+        // Update user's total score
+        var user = await _context.Users.FindAsync(userId);
+        if (user != null)
+        {
+            user.TotalScore += score;
+        }
+
+        // Save changes
         await _context.SaveChangesAsync();
     }
 }

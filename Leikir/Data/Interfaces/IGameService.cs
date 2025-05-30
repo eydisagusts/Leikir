@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Leikir.Models.DTO.Score;
+using Leikir.Models.DTO.Game.Wordle;
 
 namespace Leikir.Data.Interfaces;
 
@@ -12,7 +13,7 @@ public interface IGameService
     Task<ScoreDTO> GetCurrentGameStateAsync(int userId, int gameId);
     
     // Make a guess/attempt
-    Task<ScoreDTO> MakeAttemptAsync(int userId, int gameId, string attempt);
+    Task<WordleGuessResponseDto> MakeAttemptAsync(int userId, int gameId, string attempt);
     
     // Get daily target word (for Wordle)
     Task<string> GetDailyTargetWordAsync();

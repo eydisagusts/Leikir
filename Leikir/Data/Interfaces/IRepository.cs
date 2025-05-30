@@ -14,6 +14,8 @@ public interface IRepository
   
   Task CreateUserAsync(UserCreateDTO user);
   
+  Task<UserReadDTO?> LoginUserAsync(string email, string password);
+  
   Task<UserReadDTO> UpdateUserAsync(int id, UserCreateDTO user);
   
   Task<bool> DeleteUserAsync(int id);

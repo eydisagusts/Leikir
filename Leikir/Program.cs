@@ -23,6 +23,19 @@ public class Program
         builder.Services.AddControllersWithViews().AddNewtonsoftJson(options =>
             options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
         );
+        
+        // Add CORS
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowFrontend",
+                builder =>
+                {
+                    builder.WithOrigins("http://localhost:3000", "http://localhost:5010")
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials();
+                });
+        });
 
         // Add DbContext
         builder.Services.AddDbContext<LeikirContext>();
@@ -43,9 +56,12 @@ public class Program
         }
 
         app.UseHttpsRedirection();
-
+        
+        // Use CORS before authentication and authorization
+        app.UseCors("AllowFrontend");
+        
+        app.UseAuthentication();
         app.UseAuthorization();
-
 
         app.MapControllers();
 

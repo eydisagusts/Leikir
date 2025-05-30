@@ -1,5 +1,6 @@
 using Leikir.Data.Interfaces;
 using Leikir.Models.DTO.Game.Hangman;
+using Leikir.Models.DTO.Game.Wordle;
 using Leikir.Models.DTO.Score;
 using Leikir.Models;
 
@@ -78,7 +79,7 @@ public class HangmanGameService : IGameService
         return null;
     }
 
-    public async Task<ScoreDTO> MakeAttemptAsync(int userId, int gameId, string guess)
+    public async Task<WordleGuessResponseDto> MakeAttemptAsync(int userId, int gameId, string guess)
     {
         // Get current game state
         if (!_activeGames.TryGetValue(userId, out var gameState))
@@ -153,27 +154,28 @@ public class HangmanGameService : IGameService
             }
         }
 
-        // Create response with letter positions for frontend
-        var response = new HangmanGuessResponseDto
+        // Create response with letter states for frontend
+        var letterStates = new List<LetterState>();
+        for (int i = 0; i < gameState.TargetWord.Length; i++)
         {
-            Guess = Convert.ToChar(letter.ToString()),
+            if (gameState.GuessedLetters.Contains(gameState.TargetWord[i]))
+            {
+                letterStates.Add(LetterState.Correct);
+            }
+            else
+            {
+                letterStates.Add(LetterState.Absent);
+            }
+        }
+
+        return new WordleGuessResponseDto
+        {
+            Guess = guess,
+            LetterStates = letterStates,
             IsCorrect = isCorrect,
-            Positions = positions,
-            RemainingAttempts = MaxAttempts - gameState.WrongLetters.Count,
             IsGameOver = gameState.IsGameOver,
             IsWon = gameState.IsWon,
-            Score = gameState.Score,
-            CurrentWordState = GetCurrentWordState(gameState)
-        };
-
-        return new ScoreDTO
-        {
-            UserId = userId,
-            GameId = gameId,
-            UserScore = gameState.Score,
-            NumberOfAttempts = gameState.NumberOfAttempts,
-            GuessedWord = gameState.TargetWord,
-            AchivedAt = DateTime.UtcNow
+            Score = gameState.Score
         };
     }
 

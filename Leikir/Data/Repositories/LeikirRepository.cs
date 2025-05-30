@@ -89,11 +89,38 @@ public class LeikirRepository : IRepository
         }
     }
 
+    public async Task<UserReadDTO?> LoginUserAsync(string email, string password)
+    {
+        using (var db = _dbContext)
+        {
+            var user = await db.Users
+                .Include(u => u.Scores)
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null)
+                return null;
+            
+            if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+                return null;
+
+            return new UserReadDTO
+            {
+                Id = user.Id,
+                Name = user.Name,
+                Username = user.Username,
+                Email = user.Email,
+                TotalScore = user.Scores?.Sum(s => s.UserScore) ?? 0
+            };
+        }
+    }
+
     public async Task<UserReadDTO> UpdateUserAsync(int id, UserCreateDTO user)
     {
         using (var db = _dbContext)
         {
-            var userToUpdate = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
+            var userToUpdate = await db.Users
+                .Include(u => u.Scores)
+                .FirstOrDefaultAsync(x => x.Id == id);
 
             if (userToUpdate == null)
             {
@@ -112,7 +139,8 @@ public class LeikirRepository : IRepository
                 Id = userToUpdate.Id,
                 Name = userToUpdate.Name,
                 Username = userToUpdate.Username,
-                Email = userToUpdate.Email
+                Email = userToUpdate.Email,
+                TotalScore = userToUpdate.Scores?.Sum(s => s.UserScore) ?? 0
             };
         }
     }

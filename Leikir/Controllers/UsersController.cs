@@ -42,7 +42,7 @@ public class UsersController : ControllerBase
 
             if (user == null)
             {
-                return NotFound();
+                return NotFound("Notandi ekki til");
             }
             else
             {
@@ -77,6 +77,27 @@ public class UsersController : ControllerBase
             return StatusCode(500);
         }
     }
+    
+    
+    //Login
+    [HttpPost("login")]
+    public async Task<ActionResult<UserReadDTO>> Login([FromBody] UserLoginDTO loginData)
+    {
+        try
+        {
+            var user = await _repository.LoginUserAsync(loginData.Email, loginData.Password);
+            if (user == null)
+            {
+                return Unauthorized("Rangt netfang eða lykilorð");
+            }
+            return Ok(user);
+        }
+        catch (Exception)
+        {
+            return StatusCode(500);
+        }
+    }
+    
     
     //Update
     [HttpPut("{id}")]

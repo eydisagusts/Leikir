@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/Users/eydisla/Desktop/Leikir/Leikir/Leikir.csproj": {}
+    "/Users/eydisagusts/Desktop/Leikir/Leikir/Leikir.csproj": {}
   },
   "projects": {
-    "/Users/eydisla/Desktop/Leikir/Leikir/Leikir.csproj": {
+    "/Users/eydisagusts/Desktop/Leikir/Leikir/Leikir.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/eydisla/Desktop/Leikir/Leikir/Leikir.csproj",
+        "projectUniqueName": "/Users/eydisagusts/Desktop/Leikir/Leikir/Leikir.csproj",
         "projectName": "Leikir",
-        "projectPath": "/Users/eydisla/Desktop/Leikir/Leikir/Leikir.csproj",
-        "packagesPath": "/Users/eydisla/.nuget/packages/",
-        "outputPath": "/Users/eydisla/Desktop/Leikir/Leikir/obj/",
+        "projectPath": "/Users/eydisagusts/Desktop/Leikir/Leikir/Leikir.csproj",
+        "packagesPath": "/Users/eydisagusts/.nuget/packages/",
+        "outputPath": "/Users/eydisagusts/Desktop/Leikir/Leikir/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/Users/eydisla/.nuget/NuGet/NuGet.Config"
+          "/Users/eydisagusts/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
