@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { registerUser } from '@/services/auth';
+import Link from 'next/link';
 
 export default function RegisterPage() {
     const [formData, setFormData] = useState({
@@ -17,7 +17,6 @@ export default function RegisterPage() {
     const [success, setSuccess] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
-    const { setUser } = useAuth();
 
     const validateEmail = (email: string): boolean => {
         // Basic email format check
@@ -200,6 +199,11 @@ export default function RegisterPage() {
                         >
                             {isLoading ? 'Hleð...' : 'Nýskrá'}
                         </button>
+                    </div>
+                    <div className="text-sm text-center">
+                        <Link href="/innskraning" className="font-medium text-indigo-600 hover:text-indigo-500">
+                            Ertu nú þegar með aðgang? Skráðu þig inn hér
+                        </Link>
                     </div>
                 </form>
             </div>

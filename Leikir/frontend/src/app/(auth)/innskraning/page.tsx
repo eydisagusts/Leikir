@@ -82,7 +82,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer"
                         >
                             {isLoading ? 'Hleð...' : 'Innskrá'}
                         </button>
@@ -90,7 +90,7 @@ export default function LoginPage() {
 
                     <div className="text-sm text-center">
                         <Link href="/nyskraning" className="font-medium text-indigo-600 hover:text-indigo-500">
-                            Nýskráning
+                            Ekki með aðgang? Stofnaðu aðgang hér
                         </Link>
                     </div>
                 </form>

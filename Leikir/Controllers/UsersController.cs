@@ -145,5 +145,21 @@ public class UsersController : ControllerBase
         }
     }
     
+    //Leaderboard
+    
+    [HttpGet("leaderboard")]
+    public async Task<ActionResult<List<UserReadDTO>>> GetLeaderboard()
+    {
+        try
+        {
+            var leaderboard = await _repository.GetLeaderboardAsync();
+            return Ok(leaderboard);
+        }
+        catch (Exception)
+        {
+            return StatusCode(500);
+        }
+    }
+    
     
 }

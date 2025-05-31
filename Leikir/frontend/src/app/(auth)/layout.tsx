@@ -1,17 +1,19 @@
 import { AuthProvider } from '@/contexts/AuthContext';
 
 export default function AuthLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
-            <AuthProvider>
-                {children}
-                </AuthProvider>
-            </div>
+  return (
+    <section className="bg-gray-50 flex flex-col items-center justify-center px-6 py-8">
+      <div className="w-full bg-white rounded-lg shadow dark:border sm:max-w-2xl xl:p-0">
+        <div className="p-6 space-y-4 sm:p-8">
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </div>
-    );
+      </div>
+    </section>
+  );
 }

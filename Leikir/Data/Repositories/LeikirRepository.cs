@@ -404,4 +404,37 @@ public async Task<ScoreDTO> UpdateScoreAsync(int id, ScoreDTO score)
             }
         }
     }
+
+    public async Task<List<UserReadDTO>> GetLeaderboardAsync()
+    {
+        List<User> users;
+
+        using (var db = _dbContext)
+        {
+            users = await db.Users
+                .OrderByDescending(u => u.TotalScore)
+                .Take(10)
+                .ToListAsync();
+        }
+        
+        List<UserReadDTO> result = new List<UserReadDTO>();
+
+        foreach (User user in users)
+        {
+            UserReadDTO userToAdd = new UserReadDTO();
+
+            userToAdd.Id = user.Id;
+            userToAdd.Name = user.Name;
+            userToAdd.Username = user.Username;
+            userToAdd.Email = user.Email;
+            userToAdd.TotalScore = user.TotalScore;
+            userToAdd.TotalGames = user.TotalGames;
+            userToAdd.TotalWins = user.TotalWins;
+            userToAdd.TotalLosses = user.TotalLosses;
+            
+            result.Add(userToAdd);
+        }
+        
+        return result;
+    }
 }

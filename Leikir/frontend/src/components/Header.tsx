@@ -64,7 +64,7 @@ export default function Header() {
                             </Link>
                     
                             <Link
-                                href="/leaderboard"
+                                href="/stigatafla"
                                 className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
                                     isActive('/stigatafla') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}
@@ -72,7 +72,7 @@ export default function Header() {
                                 Stigatafla
                             </Link>
                             <Link
-                                href="/about"
+                                href="/stigatafla"
                                 className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
                                     isActive('/umokkur') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}

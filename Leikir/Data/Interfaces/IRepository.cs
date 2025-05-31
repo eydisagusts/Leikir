@@ -20,6 +20,8 @@ public interface IRepository
   
   Task<bool> DeleteUserAsync(int id);
   
+  Task<List<UserReadDTO>> GetLeaderboardAsync();
+  
   
   //Score
   

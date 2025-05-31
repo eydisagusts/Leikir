@@ -14,8 +14,7 @@ export default function HomePage() {
             Velkomin!
           </h1>
           <p className="text-xl text-black mx-auto leading-relaxed max-w-2xl px-4 mb-2">
-            Taktu þátt í spennandi áskorunum og þjálfaðu íslenskukunnáttuna þína
-            með fjölbreyttum leikjum sem henta öllum aldri.
+            Skráðu þig inn til að spila skemmtilega leiki
           </p>
         </section>
 
