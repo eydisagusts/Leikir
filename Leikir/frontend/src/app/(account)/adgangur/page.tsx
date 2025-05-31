@@ -269,7 +269,6 @@ export default function AccountPage() {
 
                                     {isEditing && (
                                         <div className="flex justify-end space-x-4">
-                                            
                                             <button
                                                 onClick={handleSave}
                                                 disabled={isSaving}
@@ -290,22 +289,26 @@ export default function AccountPage() {
                                     exit={{ opacity: 0, y: -20 }}
                                     className="space-y-6"
                                 >
-                                    <h2 className="text-xl font-semibold text-gray-900">Leikjastig</h2>
+                                    <h2 className="text-xl font-semibold text-gray-900">Tölfræði</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="bg-gray-50 rounded-lg p-6">
                                             <h3 className="text-lg font-medium text-gray-900 mb-4">Orðla</h3>
                                             <div className="space-y-3">
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Heildarstig</span>
-                                                    <span className="font-medium text-gray-900">{user.totalScore || 0}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Sigrar</span>
-                                                    <span className="font-medium text-gray-900">0</span>
+                                                    <span className="font-bold text-blue-500">{user.totalScore ?? 0}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Leikir</span>
-                                                    <span className="font-medium text-gray-900">0</span>
+                                                    <span className="font-bold text-gray-900">{user.totalGames ?? 0}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-green-500">Sigrar</span>
+                                                    <span className="font-bold text-gray-900">{user.totalWins ?? 0}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-red-500">Töp</span>
+                                                    <span className="font-bold text-gray-900">{user.totalLosses ?? 0}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -314,16 +317,21 @@ export default function AccountPage() {
                                             <div className="space-y-3">
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Heildarstig</span>
-                                                    <span className="font-medium text-gray-900">0</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600">Sigrar</span>
-                                                    <span className="font-medium text-gray-900">0</span>
+                                                    <span className="font-bold text-gray-900">0</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">Leikir</span>
-                                                    <span className="font-medium text-gray-900">0</span>
+                                                    <span className="font-bold text-gray-900">0</span>
                                                 </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-green-500">Sigrar</span>
+                                                    <span className="font-bold text-gray-900">0</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-red-500">Töp</span>
+                                                    <span className="font-bold text-gray-900">0</span>
+                                                </div>
+                                                
                                             </div>
                                         </div>
                                     </div>

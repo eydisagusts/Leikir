@@ -12,7 +12,7 @@ interface AuthContextType {
     login: (user: User) => Promise<void>;
     logout: () => void;
     clearError: () => void;
-    updateUserScore: (newScore: number) => void;
+    refreshUserData: () => Promise<void>;
     updateProfile: (userData: { name: string; username: string; email: string; password?: string }) => Promise<void>;
 }
 
@@ -23,7 +23,7 @@ const AuthContext = createContext<AuthContextType>({
     login: async () => {},
     logout: () => {},
     clearError: () => {},
-    updateUserScore: () => {},
+    refreshUserData: async () => {},
     updateProfile: async () => {},
 });
 
@@ -31,6 +31,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const refreshUserData = async () => {
+        if (!user) return;
+        try {
+            const userData = await getUserProfile(user.id);
+            
+            const updatedUser = {
+                ...user,  // Keep existing user data
+                totalScore: userData.totalScore || 0,
+                totalGames: userData.totalGames || 0,
+                totalWins: userData.totalWins || 0,
+                totalLosses: userData.totalLosses || 0
+            };
+            setUser(updatedUser);
+        } catch (err) {
+            console.error('Failed to refresh user data:', err);
+            // If we get a 401, clear the auth data
+            if (err instanceof Error && err.message.includes('401')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                setUser(null);
+            }
+        }
+    };
 
     useEffect(() => {
         const initializeAuth = async () => {
@@ -40,7 +64,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (userId && token) {
                 try {
                     const userData = await getUserProfile(parseInt(userId));
-                    setUser(userData);
+                    setUser({
+                        id: userData.id,
+                        name: userData.name,
+                        username: userData.username,
+                        email: userData.email,
+                        totalScore: userData.totalScore,
+                        totalGames: userData.totalGames,
+                        totalWins: userData.totalWins,
+                        totalLosses: userData.totalLosses
+                    });
                 } catch (err) {
                     console.error('Failed to fetch user data:', err);
                     // Clear invalid auth data
@@ -69,15 +102,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(null);
     };
 
-    const updateUserScore = (newScore: number) => {
-        if (user) {
-            setUser({
-                ...user,
-                totalScore: newScore
-            });
-        }
-    };
-
     const updateProfile = async (userData: { name: string; username: string; email: string; password?: string }) => {
         if (!user) return;
         
@@ -91,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, error, login, logout, clearError, updateUserScore, updateProfile }}>
+        <AuthContext.Provider value={{ user, loading, error, login, logout, clearError, refreshUserData, updateProfile }}>
             {children}
         </AuthContext.Provider>
     );

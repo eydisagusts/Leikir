@@ -4,6 +4,9 @@ export interface User {
     username: string;
     email: string;
     totalScore: number;
+    totalGames: number;
+    totalWins: number;
+    totalLosses: number;
 }
 
 export interface RegisterData {

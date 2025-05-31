@@ -27,7 +27,7 @@ const ACCENT_MAP: Record<string, string> = {
 };
 
 export default function WordleGame() {
-    const { user, loading: authLoading, updateUserScore } = useAuth();
+    const { user, loading: authLoading, refreshUserData } = useAuth();
     const router = useRouter();
     const [gameState, setGameState] = useState<WordleGameState | null>(null);
     const [rows, setRows] = useState<Row[]>([]);
@@ -37,7 +37,7 @@ export default function WordleGame() {
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [showResultModal, setShowResultModal] = useState(false);
-    const [lastScore, setLastScore] = useState(0);
+    const [lastScore, setLastScore] = useState<number | undefined>();
     const [revealedRows, setRevealedRows] = useState<number[]>([]);
     const [isRevealing, setIsRevealing] = useState(false);
     const [showInstructions, setShowInstructions] = useState(false);
@@ -90,10 +90,8 @@ export default function WordleGame() {
 
                     if (response.isCorrect) {
                         setLastScore(response.score);
-                        // Update user's total score immediately
-                        if (user) {
-                            updateUserScore(user.totalScore + response.score);
-                        }
+                        // Refresh user data to get updated statistics
+                        refreshUserData();
                         const newGameState = {
                             gameId: gameState.gameId,
                             isGameOver: true,
@@ -105,6 +103,8 @@ export default function WordleGame() {
                         setShowResultModal(true);
                         return; // Prevent any further state updates
                     } else if (response.isGameOver) {
+                        // Refresh user data to get updated statistics
+                        refreshUserData();
                         const newGameState = {
                             gameId: gameState.gameId,
                             isGameOver: true,
@@ -152,7 +152,7 @@ export default function WordleGame() {
             setRows(newRows);
             setCurrentColIndex(prev => prev + 1);
         }
-    }, [user, gameState, isLoading, currentRowIndex, currentColIndex, rows, letterStates, isRevealing, updateUserScore]);
+    }, [user, gameState, isLoading, currentRowIndex, currentColIndex, rows, letterStates, isRevealing, refreshUserData]);
 
     // Add new game handler
     const handleNewGame = useCallback(async () => {

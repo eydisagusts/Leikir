@@ -28,7 +28,10 @@ export async function loginUser(credentials: { username: string; password: strin
             name: data.name,
             username: data.username,
             email: data.email,
-            totalScore: data.totalScore
+            totalScore: data.totalScore,
+            totalGames: data.totalGames,
+            totalWins: data.totalWins,
+            totalLosses: data.totalLosses
         },
         token: data.token
     };
@@ -58,7 +61,10 @@ export async function registerUser(userData: { username: string; password: strin
             name: data.name,
             username: data.username,
             email: data.email,
-            totalScore: data.totalScore
+            totalScore: data.totalScore,
+            totalGames: data.totalGames,
+            totalWins: data.totalWins,
+            totalLosses: data.totalLosses
         },
         token: data.token
     };
@@ -93,6 +99,9 @@ export async function updateUser(userId: number, userData: { name: string; usern
         name: data.name,
         username: data.username,
         email: data.email,
-        totalScore: data.totalScore
+        totalScore: data.totalScore,
+        totalGames: data.totalGames,
+        totalWins: data.totalWins,
+        totalLosses: data.totalLosses
     };
 }

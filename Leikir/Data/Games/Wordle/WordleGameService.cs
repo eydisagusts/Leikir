@@ -174,6 +174,8 @@ public class WordleGameService : IGameService
             {
                 gameState.IsGameOver = true;
                 gameState.IsWon = false;
+                // Save score to database with 0 points for a loss
+                await SaveScoreAsync(userId, gameId, 0);
             }
         }
 
@@ -238,11 +240,20 @@ public class WordleGameService : IGameService
         // Add score to Scores table
         _context.Scores.Add(scoreEntity);
 
-        // Update user's total score
+        // Update user's statistics
         var user = await _context.Users.FindAsync(userId);
         if (user != null)
         {
             user.TotalScore += score;
+            user.TotalGames += 1;
+            if (score > 0) // If score > 0, it means the user won
+            {
+                user.TotalWins += 1;
+            }
+            else
+            {
+                user.TotalLosses += 1;
+            }
         }
 
         // Save changes

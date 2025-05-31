@@ -19,6 +19,9 @@ export async function getUserProfile(userId: number) {
         name: data.name,
         username: data.username,
         email: data.email,
-        totalScore: data.totalScore
+        totalScore: data.totalScore,
+        totalGames: data.totalGames,
+        totalWins: data.totalWins,
+        totalLosses: data.totalLosses
     };
 }

@@ -23,6 +23,9 @@ public class User
     public string PasswordHash { get; set; }
     
     public int TotalScore { get; set; }
+    public int TotalGames { get; set; }
+    public int TotalWins { get; set; }
+    public int TotalLosses { get; set; }
     
     public ICollection<Score> Scores { get; set; }
 }

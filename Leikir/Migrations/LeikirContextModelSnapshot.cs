@@ -108,7 +108,16 @@ namespace Leikir.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("TotalGames")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalLosses")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("TotalScore")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalWins")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Username")

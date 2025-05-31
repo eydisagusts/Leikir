@@ -40,7 +40,10 @@ public class LeikirRepository : IRepository
             userToAdd.Name = user.Name;
             userToAdd.Username = user.Username;
             userToAdd.Email = user.Email;
-            userToAdd.TotalScore = user.Scores?.Sum(s => s.UserScore) ?? 0;
+            userToAdd.TotalScore = user.TotalScore;
+            userToAdd.TotalGames = user.TotalGames;
+            userToAdd.TotalWins = user.TotalWins;
+            userToAdd.TotalLosses = user.TotalLosses;
             
             result.Add(userToAdd);
         }
@@ -68,7 +71,10 @@ public class LeikirRepository : IRepository
             Name = u.Name,
             Username = u.Username,
             Email = u.Email,
-            TotalScore = u.Scores?.Sum(s => s.UserScore) ?? 0
+            TotalScore = u.TotalScore,
+            TotalGames = u.TotalGames,
+            TotalWins = u.TotalWins,
+            TotalLosses = u.TotalLosses
         };
         return result;
     }
@@ -109,7 +115,10 @@ public class LeikirRepository : IRepository
                 Name = user.Name,
                 Username = user.Username,
                 Email = user.Email,
-                TotalScore = user.Scores?.Sum(s => s.UserScore) ?? 0
+                TotalScore = user.TotalScore,
+                TotalGames = user.TotalGames,
+                TotalWins = user.TotalWins,
+                TotalLosses = user.TotalLosses
             };
         }
     }
@@ -140,7 +149,10 @@ public class LeikirRepository : IRepository
                 Name = userToUpdate.Name,
                 Username = userToUpdate.Username,
                 Email = userToUpdate.Email,
-                TotalScore = userToUpdate.Scores?.Sum(s => s.UserScore) ?? 0
+                TotalScore = userToUpdate.TotalScore,
+                TotalGames = userToUpdate.TotalGames,
+                TotalWins = userToUpdate.TotalWins,
+                TotalLosses = userToUpdate.TotalLosses
             };
         }
     }

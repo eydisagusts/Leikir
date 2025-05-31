@@ -29,25 +29,34 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
 }
 
 export async function getUserProfile(userId: number) {
+    const token = localStorage.getItem('token');
+    
     const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
     });
 
     if (!response.ok) {
         const error = await response.text();
+        console.error('Error fetching user profile:', error);
         throw new Error(error || 'Failed to fetch user profile');
     }
 
     const data = await response.json();
+    
     // Map the backend response to match our frontend User type
-    return {
+    const mappedData = {
         id: data.userId,
         name: data.name,
         username: data.username,
         email: data.email,
-        totalScore: data.totalScore
+        totalScore: data.totalScore || 0,
+        totalGames: data.totalGames || 0,
+        totalWins: data.totalWins || 0,
+        totalLosses: data.totalLosses || 0
     };
+    return mappedData;
 } 

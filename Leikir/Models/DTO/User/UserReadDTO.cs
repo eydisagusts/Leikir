@@ -11,4 +11,7 @@ public class UserReadDTO
     public string Email { get; set; } = null!;
     
     public int TotalScore { get; set; }
+    public int TotalGames { get; set; }
+    public int TotalWins { get; set; }
+    public int TotalLosses { get; set; }
 }
