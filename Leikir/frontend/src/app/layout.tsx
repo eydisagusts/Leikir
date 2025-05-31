@@ -16,11 +16,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-100 text-black">
+      <body className="min-h-screen bg-gray-100 text-black flex flex-col">
         <AuthProvider>
           <Header />
           <main className="flex-grow">{children}</main>
-          <footer className="mt-auto p-6 bg-white text-black text-center shadow-md">
+          <footer className="p-6 bg-white text-black text-center shadow-md">
             &copy; 2025 Leikir. All rights reserved.
           </footer>
         </AuthProvider>

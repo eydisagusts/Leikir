@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Leikir")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c977645c127f27fb5cc662d210bb62605ca32a42")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+edba416188b8b8efc39acb30f4719ebedf0e8219")]
 [assembly: System.Reflection.AssemblyProductAttribute("Leikir")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Leikir")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -61,7 +61,7 @@ export default function WordleInstructions({ isOpen, onClose }: WordleInstructio
                             {activeTab === 'rules' ? (
                                 <div className="space-y-3 text-gray-700">
                                     <p className="text-sm">
-                                        Markmið leiksins er að gíska á 5 stafa leyniorð í 6 tilraunum eða færri. Eftir hverja umferð gefur leikurinn þér vísbendingar sem hjálpar þér að komast nær því að finna orðið.
+                                        Markmið leiksins er að giska á fimm stafa leyniorð í sex tilraunum eða færri. Eftir hverja umferð gefur leikurinn þér vísbendingar sem að hjálpa þér að komast nær því að finna orðið.
                                     </p>
                                     
                                     <div className="space-y-2">

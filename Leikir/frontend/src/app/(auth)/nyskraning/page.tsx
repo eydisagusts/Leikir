@@ -30,10 +30,37 @@ export default function RegisterPage() {
         return tldRegex.test(email);
     };
 
+    const validateUsername = (username: string): boolean => {
+        // Check for spaces
+        if (username.includes(' ')) {
+            setError('Notendanafn má ekki innihalda bil');
+            return false;
+        }
+
+        // Check length
+        if (username.length > 25) {
+            setError('Notendanafn má ekki vera lengra en 25 stafir');
+            return false;
+        }
+
+        // Check if it's lowercase
+        if (username !== username.toLowerCase()) {
+            setError('Notendanafn verður að vera með lágstöfum');
+            return false;
+        }
+
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setSuccess(null);
+
+        // Validate username
+        if (!validateUsername(formData.username)) {
+            return;
+        }
 
         // Validate email
         if (!validateEmail(formData.email)) {
@@ -62,7 +89,7 @@ export default function RegisterPage() {
 
         try {
             await registerUser({
-                username: formData.username,
+                username: formData.username.toLowerCase(),
                 password: formData.password,
                 email: formData.email,
                 name: formData.name
@@ -88,6 +115,11 @@ export default function RegisterPage() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value.toLowerCase();
+        setFormData({ ...formData, username: value });
     };
 
     return (
@@ -125,10 +157,11 @@ export default function RegisterPage() {
                                 name="username"
                                 type="text"
                                 required
+                                maxLength={25}
                                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                                placeholder="Notendanafn"
+                                placeholder="Notendanafn (lágstafir, engin bil, hámark 25 stafir)"
                                 value={formData.username}
-                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                onChange={handleUsernameChange}
                             />
                         </div>
                         <div>

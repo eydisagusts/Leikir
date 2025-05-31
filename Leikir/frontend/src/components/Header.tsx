@@ -12,6 +12,7 @@ export default function Header() {
     const { user, logout } = useAuth();
     const [mounted, setMounted] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Handle hydration mismatch
@@ -39,6 +40,7 @@ export default function Header() {
     const handleLogout = (): void => {
         logout();
         setIsDropdownOpen(false);
+        setShowLogoutConfirm(false);
         router.push('/');
     };
 
@@ -72,20 +74,20 @@ export default function Header() {
                                 Stigatafla
                             </Link>
                             <Link
-                                href="/stigatafla"
+                                href="/um-okkur"
                                 className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
-                                    isActive('/umokkur') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
+                                    isActive('/um-okkur') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}
                             >
-                                Um Okkur
+                                Um okkur
                             </Link>
                             <Link
-                                href="/contact"
+                                href="/hafa-samband"
                                 className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
-                                    isActive('/samband') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
+                                    isActive('/hafa-samband') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}
                             >
-                                Hafa Samband
+                                Hafa samband
                             </Link>
                         </nav>
                     </div>
@@ -136,7 +138,10 @@ export default function Header() {
                                                         Skoða/Breyta aðgangi
                                                     </Link>
                                                     <button
-                                                        onClick={handleLogout}
+                                                        onClick={() => {
+                                                            setShowLogoutConfirm(true);
+                                                            setIsDropdownOpen(false);
+                                                        }}
                                                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                                                     >
                                                         Útskrá
@@ -166,6 +171,44 @@ export default function Header() {
                     </div>
                 </div>
             </div>
+
+            {/* Logout Confirmation Modal */}
+            <AnimatePresence>
+                {showLogoutConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center p-4 z-50"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl"
+                        >
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Útskrá</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Ertu viss um að þú viljir skrá þig út?
+                            </p>
+                            <div className="flex justify-end space-x-4">
+                                <button
+                                    onClick={() => setShowLogoutConfirm(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+                                >
+                                    Hætta við
+                                </button>
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                    Útskrá
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </header>
     );
 }
