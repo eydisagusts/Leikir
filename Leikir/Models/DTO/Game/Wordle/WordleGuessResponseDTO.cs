@@ -8,6 +8,7 @@ public class WordleGuessResponseDto
     public bool IsGameOver { get; set; }
     public bool IsWon { get; set; }
     public int Score { get; set; }
+    public string TargetWord { get; set; } = null!;
 }
 
 public enum LetterState

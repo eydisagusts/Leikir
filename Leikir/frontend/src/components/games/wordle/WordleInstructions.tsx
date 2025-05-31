@@ -25,18 +25,18 @@ export default function WordleInstructions({ isOpen, onClose }: WordleInstructio
                     >
                         <button
                             onClick={onClose}
-                            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 transition-colors"
+                            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
 
-                        <h2 className="text-xl font-bold text-gray-900 mb-3">Hvernig spilar maður Orðlu?</h2>
+                        <h2 className="text-xl font-bold text-center text-gray-900 mb-3">Leikreglur Orðlu</h2>
                         
                         <div className="flex border-b border-gray-200 mb-3">
                             <button
-                                className={`px-4 py-2 text-sm font-medium ${
+                                className={`px-4 py-2 text-sm font-medium cursor-pointer ${
                                     activeTab === 'rules'
                                         ? 'text-purple-600 border-b-2 border-purple-600'
                                         : 'text-gray-500 hover:text-gray-700'
@@ -46,7 +46,7 @@ export default function WordleInstructions({ isOpen, onClose }: WordleInstructio
                                 Leikreglur
                             </button>
                             <button
-                                className={`px-4 py-2 text-sm font-medium ${
+                                className={`px-4 py-2 text-sm font-medium cursor-pointer ${
                                     activeTab === 'scoring'
                                         ? 'text-purple-600 border-b-2 border-purple-600'
                                         : 'text-gray-500 hover:text-gray-700'
@@ -61,11 +61,11 @@ export default function WordleInstructions({ isOpen, onClose }: WordleInstructio
                             {activeTab === 'rules' ? (
                                 <div className="space-y-3 text-gray-700">
                                     <p className="text-sm">
-                                        Gískaðu á leyniorðið í 6 tilraunum eða færri. Orðið er íslenskt og samanstendur af 5 stöfum.
+                                        Markmið leiksins er að gíska á 5 stafa leyniorð í 6 tilraunum eða færri. Eftir hverja umferð gefur leikurinn þér vísbendingar sem hjálpar þér að komast nær því að finna orðið.
                                     </p>
                                     
                                     <div className="space-y-2">
-                                        <h3 className="font-semibold text-sm">Eftir hverja ágískun færðu vísbendingu í stöfunum</h3>
+                                        <h3 className="font-semibold text-sm">Vísbendingarnar virka svona:</h3>
                                         <ul className="list-disc pl-5 space-y-1 text-sm">
                                             <li>
                                                 <span className="text-green-600 font-semibold">Grænn</span> þýðir að stafurinn er réttur og á réttum stað
@@ -78,11 +78,14 @@ export default function WordleInstructions({ isOpen, onClose }: WordleInstructio
                                             </li>
                                         </ul>
                                     </div>
+                                    <div>
+                                        <h3 className='font-semibold text-sm'>Hefur þú það sem þarf til að komast í top 10 á stigalistanum?</h3>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="space-y-3 text-gray-700">
                                     <p className="text-sm">
-                                        Stigin eru reiknuð út frá tveimur þáttum: fjölda tilrauna og tíma sem þú eyðir.
+                                        Stigin eru reiknuð út frá tveimur þáttum: fjölda tilrauna og þann tíma sem það tekur að finna orðið.
                                     </p>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -109,7 +112,7 @@ export default function WordleInstructions({ isOpen, onClose }: WordleInstructio
                                         </div>
                                     </div>
                                     <p className="text-sm italic">
-                                        Lokastig eru meðaltal af stigum fyrir tilraunir og tíma.
+                                        Fjöldi stiga eru svo reiknuð saman til að fá heildarstig fyrir leikinn.
                                     </p>
                                 </div>
                             )}
@@ -117,7 +120,7 @@ export default function WordleInstructions({ isOpen, onClose }: WordleInstructio
 
                         <button
                             onClick={onClose}
-                            className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                            className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors text-sm cursor-pointer"
                         >
                             Spila leik
                         </button>

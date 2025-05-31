@@ -1,8 +1,9 @@
 export interface WordleGameState {
-    gameId: number;
+    gameId: string;
     isGameOver: boolean;
     isWon: boolean;
     score: number;
+    targetWord: string;
 }
 
 export interface WordleGuessResponse {
@@ -12,6 +13,7 @@ export interface WordleGuessResponse {
     isGameOver: boolean;
     isWon: boolean;
     score: number;
+    targetWord: string;
 }
 
 export enum LetterState {

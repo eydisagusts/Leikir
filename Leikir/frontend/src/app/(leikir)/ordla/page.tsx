@@ -4,15 +4,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import WordleGrid from '@/components/games/wordle/WordleGrid';
 import WordleKeyboard from '@/components/games/wordle/WordleKeyboard';
-import ScoreAnimation from '@/components/ScoreAnimation';
+import GameResultModal from '@/components/games/wordle/GameResultModal';
 import { startNewGame, getGameState, makeGuess } from '@/services/wordle';
-import { getUserProfile } from '@/services/api';
 import type { WordleGameState, Row } from '@/types/wordle';
 import { LetterState } from '@/types/wordle';
 import { useRouter } from 'next/navigation';
 import WordleInstructions from '@/components/games/wordle/WordleInstructions';
 import WordleError from '@/components/games/wordle/WordleError';
-import type { User } from '@/types/auth';
+import NewGameConfirmationModal from '@/components/games/wordle/NewGameConfirmationModal';
 
 const WORD_LENGTH = 5;
 const MAX_ATTEMPTS = 6;
@@ -37,12 +36,14 @@ export default function WordleGame() {
     const [letterStates, setLetterStates] = useState<Record<string, LetterState>>({});
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [showScoreAnimation, setShowScoreAnimation] = useState(false);
+    const [showResultModal, setShowResultModal] = useState(false);
     const [lastScore, setLastScore] = useState(0);
     const [revealedRows, setRevealedRows] = useState<number[]>([]);
     const [isRevealing, setIsRevealing] = useState(false);
     const [showInstructions, setShowInstructions] = useState(false);
     const [waitingForAccent, setWaitingForAccent] = useState(false);
+    const [hasInitialized, setHasInitialized] = useState(false);
+    const [showNewGameConfirmation, setShowNewGameConfirmation] = useState(false);
 
     // Handle keyboard input
     const handleKeyPress = useCallback(async (key: string) => {
@@ -58,7 +59,7 @@ export default function WordleGame() {
             setIsRevealing(true);
             try {
                 const guess = rows[currentRowIndex].letters.join('');
-                const response = await makeGuess(user.id, guess, gameState.gameId);
+                const response = await makeGuess(user.id, guess, parseInt(gameState.gameId));
 
                 // Update rows with letter states
                 const newRows = [...rows];
@@ -93,12 +94,27 @@ export default function WordleGame() {
                         if (user) {
                             updateUserScore(user.totalScore + response.score);
                         }
-                        setTimeout(() => {
-                            setGameState(prev => prev ? { ...prev, isGameOver: true, isWon: true, score: response.score } : null);
-                            setShowScoreAnimation(true);
-                        }, 500);
+                        const newGameState = {
+                            gameId: gameState.gameId,
+                            isGameOver: true,
+                            isWon: true,
+                            score: response.score,
+                            targetWord: response.targetWord
+                        };
+                        setGameState(newGameState);
+                        setShowResultModal(true);
+                        return; // Prevent any further state updates
                     } else if (response.isGameOver) {
-                        setGameState(prev => prev ? { ...prev, isGameOver: true, isWon: false, score: response.score } : null);
+                        const newGameState = {
+                            gameId: gameState.gameId,
+                            isGameOver: true,
+                            isWon: false,
+                            score: response.score,
+                            targetWord: response.targetWord
+                        };
+                        setGameState(newGameState);
+                        setShowResultModal(true);
+                        return; // Prevent any further state updates
                     } else {
                         setCurrentRowIndex(prev => prev + 1);
                         setCurrentColIndex(0);
@@ -144,20 +160,30 @@ export default function WordleGame() {
         
         setIsLoading(true);
         try {
-            const newState = await startNewGame(user.id);
-            setGameState(newState);
+            const response = await startNewGame(user.id);
+            setGameState({
+                gameId: response.gameId,
+                isGameOver: false,
+                isWon: false,
+                score: 0,
+                targetWord: response.targetWord
+            });
             setCurrentRowIndex(0);
             setCurrentColIndex(0);
-            setRows([]);
+            setRows(Array(MAX_ATTEMPTS).fill(null).map(() => ({
+                letters: Array(WORD_LENGTH).fill(''),
+                states: Array(WORD_LENGTH).fill(null)
+            })));
             setRevealedRows([]);
             setLetterStates({});
             setError(null);
+            setShowResultModal(false);
         } catch (err) {
             setError('Villa kom upp við að byrja nýtt leik. Vinsamlegast reyndu aftur.');
         } finally {
             setIsLoading(false);
         }
-    }, [user, isLoading, updateUserScore]);
+    }, [user, isLoading]);
 
     // Handle auth state
     useEffect(() => {
@@ -166,11 +192,10 @@ export default function WordleGame() {
         }
     }, [authLoading, user, router]);
 
-    // Initialize game
+    // Initialize game only once when component mounts
     useEffect(() => {
+        if (!user || hasInitialized) return;
         const initGame = async () => {
-            if (!user) return;
-
             try {
                 setIsLoading(true);
                 const response = await startNewGame(user.id);
@@ -178,7 +203,8 @@ export default function WordleGame() {
                     gameId: response.gameId,
                     isGameOver: false,
                     isWon: false,
-                    score: 0
+                    score: 0,
+                    targetWord: response.targetWord
                 });
                 setRows(Array(MAX_ATTEMPTS).fill(null).map(() => ({
                     letters: Array(WORD_LENGTH).fill(''),
@@ -188,15 +214,15 @@ export default function WordleGame() {
                 setCurrentColIndex(0);
                 setLetterStates({});
                 setRevealedRows([]);
+                setHasInitialized(true);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Villa kom upp við að byrja leik');
             } finally {
                 setIsLoading(false);
             }
         };
-
         initGame();
-    }, [user, updateUserScore]);
+    }, [user, hasInitialized]);
 
     // Handle physical keyboard
     useEffect(() => {
@@ -266,7 +292,7 @@ export default function WordleGame() {
                 )}
 
                 <div className="w-full max-w-lg mx-auto relative">
-                    <div className="absolute -left-24 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+                    <div className="absolute -left-24 top-1/4 -translate-y-1/2 flex flex-col gap-3">
                         <button
                             className="text-sm px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors duration-200 cursor-pointer text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                             onClick={() => setShowInstructions(true)}
@@ -275,7 +301,7 @@ export default function WordleGame() {
                         </button>
                         <button
                             className="text-sm px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors duration-200 cursor-pointer text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={handleNewGame}
+                            onClick={() => setShowNewGameConfirmation(true)}
                             disabled={isLoading}
                         >
                             Nýr Leikur
@@ -315,16 +341,27 @@ export default function WordleGame() {
                 </div>
             </main>
 
-            {showScoreAnimation && (
-                <ScoreAnimation
-                    score={lastScore}
-                    onComplete={() => setShowScoreAnimation(false)}
-                />
-            )}
+            <GameResultModal
+                isOpen={showResultModal}
+                onClose={() => setShowResultModal(false)}
+                onNewGame={handleNewGame}
+                isWon={gameState?.isWon || false}
+                score={lastScore}
+                targetWord={gameState?.targetWord}
+            />
 
             <WordleInstructions
                 isOpen={showInstructions}
                 onClose={() => setShowInstructions(false)}
+            />
+
+            <NewGameConfirmationModal
+                isOpen={showNewGameConfirmation}
+                onClose={() => setShowNewGameConfirmation(false)}
+                onConfirm={() => {
+                    setShowNewGameConfirmation(false);
+                    handleNewGame();
+                }}
             />
         </div>
     );

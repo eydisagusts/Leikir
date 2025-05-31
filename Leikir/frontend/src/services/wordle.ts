@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './api';
-import type { WordleGameState } from '@/types/wordle';
+import type { WordleGameState, WordleGuessResponse } from '@/types/wordle';
 
 export async function startNewGame(userId: number) {
     const response = await fetch(`${API_BASE_URL}/wordle/start?userId=${userId}`, {
@@ -19,7 +19,8 @@ export async function startNewGame(userId: number) {
         gameId: data.gameId,
         isGameOver: false,
         isWon: false,
-        score: 0
+        score: 0,
+        targetWord: data.guessedWord
     };
 }
 
@@ -41,7 +42,8 @@ export async function getGameState(userId: number, gameId: number) {
         gameId: data.gameId,
         isGameOver: data.isGameOver,
         isWon: data.isWon,
-        score: data.score
+        score: data.score,
+        targetWord: data.guessedWord
     };
 }
 

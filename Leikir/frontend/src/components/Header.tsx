@@ -46,16 +46,18 @@ export default function Header() {
         <header className="bg-white shadow-md">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
-                    <Link href="/" className="text-2xl font-bold text-black">
-                        Leikir
-                    </Link>
+                    <div className="absolute left-5 ">
+                        <Link href="/" className="text-2xl font-bold text-black hover:text-blue-600 transition-colors">
+                            Leikir
+                        </Link>
+                    </div>
 
-                    <div className="flex-1 flex justify-center">
-                        <nav className="flex space-x-4">
+                    <div className="hidden md:flex flex-1 justify-center">
+                        <nav className="flex space-x-8 ">
                             <Link
                                 href="/"
-                                className={`px-3 py-2 rounded-md text-lg font-medium ${
-                                    isActive('/') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
+                                    isActive('/') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}
                             >
                                 Heim
@@ -63,24 +65,24 @@ export default function Header() {
                     
                             <Link
                                 href="/leaderboard"
-                                className={`px-3 py-2 rounded-md text-lg font-medium ${
-                                    isActive('/stigatafla') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
+                                    isActive('/stigatafla') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}
                             >
                                 Stigatafla
                             </Link>
                             <Link
                                 href="/about"
-                                className={`px-3 py-2 rounded-md text-lg font-medium ${
-                                    isActive('/umokkur') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
+                                    isActive('/umokkur') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}
                             >
                                 Um Okkur
                             </Link>
                             <Link
                                 href="/contact"
-                                className={`px-3 py-2 rounded-md text-lg font-medium ${
-                                    isActive('/samband') ? 'text-blue-600' : 'text-gray-700 hover:text-gray-900'
+                                className={`px-3 py-2 rounded-md text-lg font-medium transition-colors ${
+                                    isActive('/samband') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                                 }`}
                             >
                                 Hafa Samband
@@ -88,10 +90,10 @@ export default function Header() {
                         </nav>
                     </div>
 
-                    <div className="flex-shrink-0">
+                    <div className="absolute right-5">
                         {user ? (
                             <div className="flex items-center space-x-4" ref={dropdownRef}>
-                                <div className="flex items-center space-x-2">
+                                <div className="hidden md:flex items-center space-x-2">
                                     <span className="text-gray-700 font-medium">{user.username}</span>
                                     <div className="flex items-center space-x-1 bg-gray-100 px-3 py-1 rounded-full">
                                         <span className="text-gray-600">Stig:</span>
@@ -102,9 +104,10 @@ export default function Header() {
                                 <div className="relative">
                                     <button
                                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                        className="px-4 py-2 rounded-md text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                                        className="px-4 py-1 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors space-x-1 cursor-pointer"
                                     >
-                                        <span>Minn aðgangur</span>
+                                        <span className="hidden md:inline ">Minn aðgangur</span>
+                                        <span className="md:hidden">Mín</span>
                                         <svg
                                             className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
                                             fill="none"
@@ -122,19 +125,19 @@ export default function Header() {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 exit={{ opacity: 0, y: -10 }}
                                                 transition={{ duration: 0.2 }}
-                                                className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                                                className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
                                             >
                                                 <div className="py-1">
                                                     <Link
-                                                        href="/profile"
-                                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
+                                                        href="/adgangur"
+                                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                                                         onClick={() => setIsDropdownOpen(false)}
                                                     >
                                                         Breyta prófíl
                                                     </Link>
                                                     <button
                                                         onClick={handleLogout}
-                                                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-700 hover:text-white cursor-pointer"
+                                                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                                                     >
                                                         Útskrá
                                                     </button>
@@ -148,7 +151,7 @@ export default function Header() {
                             <div className="flex space-x-4">
                                 <Link
                                     href="/nyskraning"
-                                    className="px-4 py-2 rounded-md text-lg font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                                    className="px-4 py-2 rounded-md text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
                                 >
                                     Nýskráning
                                 </Link>

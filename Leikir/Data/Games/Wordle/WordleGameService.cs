@@ -185,7 +185,8 @@ public class WordleGameService : IGameService
             IsCorrect = isCorrect,
             IsGameOver = gameState.IsGameOver,
             IsWon = gameState.IsWon,
-            Score = gameState.Score
+            Score = gameState.Score,
+            TargetWord = gameState.TargetWord
         };
     }
 
