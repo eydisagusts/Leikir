@@ -5,16 +5,43 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
+interface PasswordFormData {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}
+
 export default function AccountPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, loading: authLoading, updateProfile } = useAuth();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'profile' | 'stats' | 'settings'>('profile');
     const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
         username: user?.username || ''
     });
+    const [passwordFormData, setPasswordFormData] = useState<PasswordFormData>({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+    });
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
+    // Update form data when user changes
+    React.useEffect(() => {
+        if (user) {
+            setFormData({
+                name: user.name,
+                email: user.email,
+                username: user.username
+            });
+        }
+    }, [user]);
 
     // Handle auth state
     React.useEffect(() => {
@@ -22,6 +49,67 @@ export default function AccountPage() {
             router.push('/innskraning');
         }
     }, [authLoading, user, router]);
+
+    const validatePassword = (password: string): boolean => {
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        const isLongEnough = password.length >= 8;
+
+        return hasUpperCase && hasLowerCase && hasNumber && isLongEnough;
+    };
+
+    const handleSave = async () => {
+        setError(null);
+        setIsSaving(true);
+        try {
+            await updateProfile(formData);
+            setIsEditing(false);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Villa kom upp við að uppfæra prófíl');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handlePasswordChange = async () => {
+        setPasswordError(null);
+        setPasswordSuccess(null);
+        
+        // Validate new password
+        if (!validatePassword(passwordFormData.newPassword)) {
+            setPasswordError('Lykilorð verður að innihalda að minnsta kosti 8 stafi, einn hástaf, einn lágstaf og einn tölustaf');
+            return;
+        }
+
+        // Check if passwords match
+        if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
+            setPasswordError('Lykilorðin passa ekki saman');
+            return;
+        }
+
+        setIsChangingPassword(true);
+        try {
+            await updateProfile({
+                ...formData,
+                password: passwordFormData.newPassword
+            });
+            setPasswordFormData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
+            setPasswordSuccess('Lykilorði hefur verið breytt');
+            // Clear success message after 3 seconds
+            setTimeout(() => {
+                setPasswordSuccess(null);
+            }, 3000);
+        } catch (err) {
+            setPasswordError(err instanceof Error ? err.message : 'Villa kom upp við að uppfæra lykilorð');
+        } finally {
+            setIsChangingPassword(false);
+        }
+    };
 
     if (authLoading) {
         return (
@@ -59,17 +147,17 @@ export default function AccountPage() {
                         <nav className="flex space-x-8 px-6" aria-label="Tabs">
                             <button
                                 onClick={() => setActiveTab('profile')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                                className={`py-4 px-1 border-b-2 font-medium text-sm cursor-pointer ${
                                     activeTab === 'profile'
                                         ? 'border-blue-600 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                             >
-                                Prófíl
+                                Minn Aðgangur
                             </button>
                             <button
                                 onClick={() => setActiveTab('stats')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                                className={`py-4 px-1 border-b-2 font-medium text-sm cursor-pointer ${
                                     activeTab === 'stats'
                                         ? 'border-blue-600 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -79,7 +167,7 @@ export default function AccountPage() {
                             </button>
                             <button
                                 onClick={() => setActiveTab('settings')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                                className={`py-4 px-1 border-b-2 font-medium text-sm cursor-pointer ${
                                     activeTab === 'settings'
                                         ? 'border-blue-600 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -102,64 +190,92 @@ export default function AccountPage() {
                                     className="space-y-6"
                                 >
                                     <div className="flex justify-between items-center">
-                                        <h2 className="text-xl font-semibold text-gray-900">Persónuupplýsingar</h2>
+                                        <h2 className="text-xl font-semibold text-gray-900">Mínar upplýsingar</h2>
                                         <button
-                                            onClick={() => setIsEditing(!isEditing)}
-                                            className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                                            onClick={() => {
+                                                if (isEditing) {
+                                                    setFormData({
+                                                        name: user.name,
+                                                        email: user.email,
+                                                        username: user.username
+                                                    });
+                                                }
+                                                setIsEditing(!isEditing);
+                                            }}
+                                            className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer"
                                         >
                                             {isEditing ? 'Hætta við' : 'Breyta'}
                                         </button>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Nafn</label>
+                                    {error && (
+                                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-6">
+                                        <div className="relative group">
+                                            <label
+                                                htmlFor="name"
+                                                className="block text-sm font-medium text-gray-700 mb-1"
+                                            >
+                                                Nafn
+                                            </label>
                                             <input
                                                 type="text"
+                                                id="name"
                                                 value={formData.name}
                                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                 disabled={!isEditing}
-                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                                                className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-all duration-200 ease-in-out"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Netfang</label>
+
+                                        <div className="relative group">
+                                            <label
+                                                htmlFor="email"
+                                                className="block text-sm font-medium text-gray-700 mb-1"
+                                            >
+                                                Netfang
+                                            </label>
                                             <input
                                                 type="email"
+                                                id="email"
                                                 value={formData.email}
                                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                                 disabled={!isEditing}
-                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                                                className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-all duration-200 ease-in-out"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Notendanafn</label>
+
+                                        <div className="relative group">
+                                            <label
+                                                htmlFor="username"
+                                                className="block text-sm font-medium text-gray-700 mb-1"
+                                            >
+                                                Notendanafn
+                                            </label>
                                             <input
                                                 type="text"
+                                                id="username"
                                                 value={formData.username}
                                                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                                 disabled={!isEditing}
-                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                                                className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-all duration-200 ease-in-out"
                                             />
                                         </div>
                                     </div>
 
                                     {isEditing && (
                                         <div className="flex justify-end space-x-4">
+                                            
                                             <button
-                                                onClick={() => setIsEditing(false)}
-                                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                                                onClick={handleSave}
+                                                disabled={isSaving}
+                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                             >
-                                                Hætta við
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    // TODO: Implement save functionality
-                                                    setIsEditing(false);
-                                                }}
-                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                                            >
-                                                Vista breytingar
+                                                {isSaving ? 'Vista...' : 'Vista breytingar'}
                                             </button>
                                         </div>
                                     )}
@@ -223,24 +339,95 @@ export default function AccountPage() {
                                     className="space-y-6"
                                 >
                                     <h2 className="text-xl font-semibold text-gray-900">Stillingar</h2>
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h3 className="text-sm font-medium text-gray-900">Breyta lykilorði</h3>
-                                                <p className="text-sm text-gray-500">Uppfærðu lykilorðið þitt reglulega</p>
+                                    <div className="space-y-6">
+                                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                                            <div className="p-6">
+                                                <h3 className="text-lg font-medium text-gray-900 mb-6">Breyta lykilorði</h3>
+                                                {passwordError && (
+                                                    <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+                                                        {passwordError}
+                                                    </div>
+                                                )}
+                                                {passwordSuccess && (
+                                                    <div className="mb-6 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md">
+                                                        {passwordSuccess}
+                                                    </div>
+                                                )}
+                                                <div className="space-y-6">
+                                                    <div className="relative group">
+                                                        <label
+                                                            htmlFor="currentPassword"
+                                                            className="block text-sm font-medium text-gray-700 mb-1"
+                                                        >
+                                                            Núverandi lykilorð
+                                                        </label>
+                                                        <input
+                                                            type="password"
+                                                            id="currentPassword"
+                                                            value={passwordFormData.currentPassword}
+                                                            onChange={(e) => setPasswordFormData({ ...passwordFormData, currentPassword: e.target.value })}
+                                                            className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 ease-in-out"
+                                                        />
+                                                    </div>
+
+                                                    <div className="relative group">
+                                                        <label
+                                                            htmlFor="newPassword"
+                                                            className="block text-sm font-medium text-gray-700 mb-1"
+                                                        >
+                                                            Nýtt lykilorð
+                                                        </label>
+                                                        <input
+                                                            type="password"
+                                                            id="newPassword"
+                                                            value={passwordFormData.newPassword}
+                                                            onChange={(e) => setPasswordFormData({ ...passwordFormData, newPassword: e.target.value })}
+                                                            className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 ease-in-out"
+                                                        />
+                                                        <p className="mt-2 text-sm text-gray-500">
+                                                            Lykilorð verður að innihalda að minnsta kosti 8 stafi, einn hástaf, einn lágstaf og einn tölustaf
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="relative group">
+                                                        <label
+                                                            htmlFor="confirmPassword"
+                                                            className="block text-sm font-medium text-gray-700 mb-1"
+                                                        >
+                                                            Staðfesta nýtt lykilorð
+                                                        </label>
+                                                        <input
+                                                            type="password"
+                                                            id="confirmPassword"
+                                                            value={passwordFormData.confirmPassword}
+                                                            onChange={(e) => setPasswordFormData({ ...passwordFormData, confirmPassword: e.target.value })}
+                                                            className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 ease-in-out"
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex justify-end pt-4">
+                                                        <button
+                                                            onClick={handlePasswordChange}
+                                                            disabled={isChangingPassword}
+                                                            className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-in-out cursor-pointer"
+                                                        >
+                                                            {isChangingPassword ? 'Vistar...' : 'Vista lykilorð'}
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <button className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700">
-                                                Breyta
-                                            </button>
                                         </div>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h3 className="text-sm font-medium text-gray-900">Eyða aðgangi</h3>
-                                                <p className="text-sm text-gray-500">Eyða aðgangi þínum og öllum gögnum</p>
+
+                                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                                            <div className="p-6">
+                                                <h3 className="text-lg font-medium text-gray-900 mb-4">Eyða aðgangi</h3>
+                                                <p className="text-sm text-gray-500 mb-6">
+                                                    Þegar þú eyðir aðgangi þínum verður allt gagnasafn þitt eytt og ekki er hægt að endurheimta það.
+                                                </p>
+                                                <button className="px-6 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 ease-in-out">
+                                                    Eyða aðgangi
+                                                </button>
                                             </div>
-                                            <button className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700">
-                                                Eyða
-                                            </button>
                                         </div>
                                     </div>
                                 </motion.div>

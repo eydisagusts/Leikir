@@ -133,7 +133,7 @@ export default function Header() {
                                                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                                                         onClick={() => setIsDropdownOpen(false)}
                                                     >
-                                                        Breyta prófíl
+                                                        Skoða/Breyta aðgangi
                                                     </Link>
                                                     <button
                                                         onClick={handleLogout}
