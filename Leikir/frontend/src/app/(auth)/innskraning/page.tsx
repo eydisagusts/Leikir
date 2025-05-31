@@ -22,8 +22,7 @@ export default function LoginPage() {
         try {
             const { user } = await loginUser({ username, password });
             await login(user);
-            router.push('/');
-            router.refresh();
+            window.location.href = '/';
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Villa kom upp við innskráningu');
         } finally {

@@ -52,20 +52,22 @@ export async function registerUser(userData: { username: string; password: strin
     }
 
     const data = await response.json();
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('userId', data.id.toString());
     
+    // Create a user object with default values for new users
+    const user = {
+        id: data.userId, // Use userId from the response
+        name: data.name,
+        username: data.username,
+        email: data.email,
+        totalScore: 0,
+        totalGames: 0,
+        totalWins: 0,
+        totalLosses: 0
+    };
+
+    // Don't set token or userId in localStorage since we want them to log in
     return {
-        user: {
-            id: data.id,
-            name: data.name,
-            username: data.username,
-            email: data.email,
-            totalScore: data.totalScore,
-            totalGames: data.totalGames,
-            totalWins: data.totalWins,
-            totalLosses: data.totalLosses
-        },
+        user,
         token: data.token
     };
 }
@@ -104,4 +106,19 @@ export async function updateUser(userId: number, userData: { name: string; usern
         totalWins: data.totalWins,
         totalLosses: data.totalLosses
     };
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Failed to delete account');
+    }
 }

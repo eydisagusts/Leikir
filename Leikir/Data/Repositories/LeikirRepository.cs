@@ -136,10 +136,19 @@ public class LeikirRepository : IRepository
                 return null;
             }
 
+            // If a new password is provided, verify the current password first
+            if (!string.IsNullOrEmpty(user.Password))
+            {
+                if (!BCrypt.Net.BCrypt.Verify(user.CurrentPassword, userToUpdate.PasswordHash))
+                {
+                    throw new Exception("Rangt núverandi lykilorð");
+                }
+                userToUpdate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Password);
+            }
+
             userToUpdate.Name = user.Name;
             userToUpdate.Username = user.Username;
             userToUpdate.Email = user.Email;
-            userToUpdate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Password);
 
             await db.SaveChangesAsync();
 

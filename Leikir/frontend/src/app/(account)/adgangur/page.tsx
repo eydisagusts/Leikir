@@ -1,39 +1,35 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { updateUser, deleteUser } from '@/services/auth';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface PasswordFormData {
-    currentPassword: string;
-    newPassword: string;
-    confirmPassword: string;
-}
 
 export default function AccountPage() {
-    const { user, loading: authLoading, updateProfile } = useAuth();
+    const { user, loading: authLoading, updateProfile, logout } = useAuth();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'profile' | 'stats' | 'settings'>('profile');
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
         username: user?.username || ''
     });
-    const [passwordFormData, setPasswordFormData] = useState<PasswordFormData>({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-    });
-    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
 
     // Update form data when user changes
-    React.useEffect(() => {
+    useEffect(() => {
         if (user) {
             setFormData({
                 name: user.name,
@@ -44,20 +40,12 @@ export default function AccountPage() {
     }, [user]);
 
     // Handle auth state
-    React.useEffect(() => {
+    useEffect(() => {
         if (!authLoading && !user) {
             router.push('/innskraning');
         }
     }, [authLoading, user, router]);
 
-    const validatePassword = (password: string): boolean => {
-        const hasUpperCase = /[A-Z]/.test(password);
-        const hasLowerCase = /[a-z]/.test(password);
-        const hasNumber = /\d/.test(password);
-        const isLongEnough = password.length >= 8;
-
-        return hasUpperCase && hasLowerCase && hasNumber && isLongEnough;
-    };
 
     const handleSave = async () => {
         setError(null);
@@ -72,42 +60,71 @@ export default function AccountPage() {
         }
     };
 
-    const handlePasswordChange = async () => {
-        setPasswordError(null);
-        setPasswordSuccess(null);
+    const handlePasswordChange = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError('');
+        setPasswordSuccess('');
         
-        // Validate new password
-        if (!validatePassword(passwordFormData.newPassword)) {
-            setPasswordError('Lykilorð verður að innihalda að minnsta kosti 8 stafi, einn hástaf, einn lágstaf og einn tölustaf');
-            return;
-        }
-
-        // Check if passwords match
-        if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
+        if (newPassword !== confirmPassword) {
             setPasswordError('Lykilorðin passa ekki saman');
             return;
         }
 
-        setIsChangingPassword(true);
+        // Check password requirements
+        const hasUpperCase = /[A-Z]/.test(newPassword);
+        const hasLowerCase = /[a-z]/.test(newPassword);
+        const hasNumber = /\d/.test(newPassword);
+        const isLongEnough = newPassword.length >= 8;
+
+        if (!hasUpperCase || !hasLowerCase || !hasNumber || !isLongEnough) {
+            setPasswordError('Lykilorðið verður að innihalda að minnsta kosti 8 stafi, einn hástaf, einn lágstaf og einn tölustaf');
+            return;
+        }
+
         try {
-            await updateProfile({
-                ...formData,
-                password: passwordFormData.newPassword
-            });
-            setPasswordFormData({
-                currentPassword: '',
-                newPassword: '',
-                confirmPassword: ''
-            });
+            if (!user) {
+                throw new Error('Notandi fannst ekki');
+            }
+
+            const updateData = {
+                name: user.name,
+                username: user.username,
+                email: user.email,
+                password: newPassword,
+                currentPassword: currentPassword
+            };
+            await updateUser(user.id, updateData);
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setPasswordError('');
             setPasswordSuccess('Lykilorði hefur verið breytt');
             // Clear success message after 3 seconds
             setTimeout(() => {
-                setPasswordSuccess(null);
+                setPasswordSuccess('');
             }, 3000);
+        } catch (error: any) {
+            if (error.message === 'Rangt núverandi lykilorð') {
+                setPasswordError('Villa kom upp við að staðfesta lykilorð');
+            } else {
+                setPasswordError('Villa kom upp við að breyta lykilorði');
+            }
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!user) return;
+        
+        setIsDeleting(true);
+        try {
+            await deleteUser(user.id);
+            logout();
+            router.push('/');
         } catch (err) {
-            setPasswordError(err instanceof Error ? err.message : 'Villa kom upp við að uppfæra lykilorð');
+            setError(err instanceof Error ? err.message : 'Villa kom upp við að eyða aðgangi');
+            setShowDeleteConfirm(false);
         } finally {
-            setIsChangingPassword(false);
+            setIsDeleting(false);
         }
     };
 
@@ -362,77 +379,66 @@ export default function AccountPage() {
                                                     </div>
                                                 )}
                                                 <div className="space-y-6">
-                                                    <div className="relative group">
-                                                        <label
-                                                            htmlFor="currentPassword"
-                                                            className="block text-sm font-medium text-gray-700 mb-1"
-                                                        >
-                                                            Núverandi lykilorð
-                                                        </label>
-                                                        <input
-                                                            type="password"
-                                                            id="currentPassword"
-                                                            value={passwordFormData.currentPassword}
-                                                            onChange={(e) => setPasswordFormData({ ...passwordFormData, currentPassword: e.target.value })}
-                                                            className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 ease-in-out"
-                                                        />
-                                                    </div>
-
-                                                    <div className="relative group">
-                                                        <label
-                                                            htmlFor="newPassword"
-                                                            className="block text-sm font-medium text-gray-700 mb-1"
-                                                        >
-                                                            Nýtt lykilorð
-                                                        </label>
-                                                        <input
-                                                            type="password"
-                                                            id="newPassword"
-                                                            value={passwordFormData.newPassword}
-                                                            onChange={(e) => setPasswordFormData({ ...passwordFormData, newPassword: e.target.value })}
-                                                            className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 ease-in-out"
-                                                        />
-                                                        <p className="mt-2 text-sm text-gray-500">
-                                                            Lykilorð verður að innihalda að minnsta kosti 8 stafi, einn hástaf, einn lágstaf og einn tölustaf
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="relative group">
-                                                        <label
-                                                            htmlFor="confirmPassword"
-                                                            className="block text-sm font-medium text-gray-700 mb-1"
-                                                        >
-                                                            Staðfesta nýtt lykilorð
-                                                        </label>
-                                                        <input
-                                                            type="password"
-                                                            id="confirmPassword"
-                                                            value={passwordFormData.confirmPassword}
-                                                            onChange={(e) => setPasswordFormData({ ...passwordFormData, confirmPassword: e.target.value })}
-                                                            className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 ease-in-out"
-                                                        />
-                                                    </div>
-
-                                                    <div className="flex justify-end pt-4">
+                                                    <form onSubmit={handlePasswordChange} className="space-y-4">
+                                                        <div>
+                                                            <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
+                                                                Núverandi lykilorð
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                id="currentPassword"
+                                                                value={currentPassword}
+                                                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                                                className="mt-1 block w-full px-4 py-3 text-gray-900 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
+                                                                Nýtt lykilorð
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                id="newPassword"
+                                                                value={newPassword}
+                                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                                className="mt-1 block w-full px-4 py-3 text-gray-900 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                                                required
+                                                            />
+                                                            <p className="mt-2 text-sm text-gray-500">
+                                                                Lykilorð verður að innihalda að minnsta kosti 8 stafi, einn hástaf, einn lágstaf og einn tölustaf
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                                                                Staðfesta nýtt lykilorð
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                id="confirmPassword"
+                                                                value={confirmPassword}
+                                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                                className="mt-1 block w-full px-4 py-3 text-gray-900 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                                                required
+                                                            />
+                                                        </div>
                                                         <button
-                                                            onClick={handlePasswordChange}
-                                                            disabled={isChangingPassword}
-                                                            className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-in-out cursor-pointer"
+                                                            type="submit"
+                                                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
                                                         >
-                                                            {isChangingPassword ? 'Vistar...' : 'Vista lykilorð'}
+                                                            Breyta lykilorði
                                                         </button>
-                                                    </div>
+                                                    </form>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                                             <div className="p-6">
-                                                <h3 className="text-lg font-medium text-gray-900 mb-4">Eyða aðgangi</h3>
-                                                <p className="text-sm text-gray-500 mb-6">
-                                                    Þegar þú eyðir aðgangi þínum verður allt gagnasafn þitt eytt og ekki er hægt að endurheimta það.
-                                                </p>
-                                                <button className="px-6 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 ease-in-out">
+                                                <button 
+                                                    onClick={() => setShowDeleteConfirm(true)}
+                                                    className="px-6 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 ease-in-out cursor-pointer"
+                                                >
                                                     Eyða aðgangi
                                                 </button>
                                             </div>
@@ -444,6 +450,46 @@ export default function AccountPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Delete Account Confirmation Modal */}
+            <AnimatePresence>
+                {showDeleteConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center p-4 z-50"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl"
+                        >
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Eyða aðgangi</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Ertu viss um að þú viljir eyða aðgangnum þínum? Ef þú eyðir aðgangnum þínum þá verður ekki hægt að endurheimta hann. Allar upplýsingar og tölfræði tengdar þínum aðgangi verða eytt.
+                            </p>
+                            <div className="flex justify-end space-x-4">
+                                <button
+                                    onClick={() => setShowDeleteConfirm(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+                                    disabled={isDeleting}
+                                >
+                                    Hætta við
+                                </button>
+                                <button
+                                    onClick={handleDeleteAccount}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 cursor-pointer"
+                                    disabled={isDeleting}
+                                >
+                                    {isDeleting ? 'Eyði...' : 'Eyða aðgangi'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

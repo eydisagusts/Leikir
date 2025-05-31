@@ -14,6 +14,7 @@ interface AuthContextType {
     clearError: () => void;
     refreshUserData: () => Promise<void>;
     updateProfile: (userData: { name: string; username: string; email: string; password?: string }) => Promise<void>;
+    setUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
     clearError: () => {},
     refreshUserData: async () => {},
     updateProfile: async () => {},
+    setUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -115,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, error, login, logout, clearError, refreshUserData, updateProfile }}>
+        <AuthContext.Provider value={{ user, loading, error, login, logout, clearError, refreshUserData, updateProfile, setUser }}>
             {children}
         </AuthContext.Provider>
     );
