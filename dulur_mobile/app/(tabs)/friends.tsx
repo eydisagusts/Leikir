@@ -527,19 +527,33 @@ export default function FriendsScreen() {
                                 <Ionicons name="close" size={24} color="#1e1b4b" />
                             </TouchableOpacity>
                         </View>
+                        {(!currentUserSubscribed || !selectedFriend?.is_subscribed) ? (
+                            <Text className="text-slate-500 text-sm mb-6 leading-5">
+                                Aðeins áskrifendur geta skorað og tekið við áskorun í öðrum leikjum en ókeypis leikjunum. Ef það er lás á áskriftarleikjum þá vantar þig eða vini þínum áskrift til að spila. Endilega hafðu samband ef báðir aðilar eru með áskrift en þið sjáið samt lás.
+                            </Text>
+                        ) : (
+                            <Text className="text-slate-500 text-sm mb-6 leading-5">
+                                Valið er þitt! Þið getið bæði spilað alla leikina.
+                            </Text>
+                        )}
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View className="flex-row flex-wrap justify-between gap-3 pb-8">
                                 {GAMES.map(g => {
-                                    const isFree = ['ordla', 'hengimadur', 'sudoku'].includes(g.id);
+                                    const isFreeGame = ['ordla', 'hengimadur', 'sudoku'].includes(g.id);
+                                    const canPlay = isFreeGame || (currentUserSubscribed && selectedFriend?.is_subscribed);
+
                                     return (
                                         <TouchableOpacity activeOpacity={0.7} 
                                             key={g.id} 
-                                            className={`w-[48%] bg-white p-4 rounded-2xl items-center border border-slate-200 shadow-sm mb-3`}
+                                            className={`w-[48%] p-4 rounded-2xl items-center border mb-3 ${!canPlay ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 shadow-sm'}`}
                                             onPress={() => handleCreateChallenge(g.id)}
-                                            disabled={isIssuingChallenge === g.id}
+                                            disabled={isIssuingChallenge === g.id || !canPlay}
                                         >
-                                            <Text className="font-bold text-lg text-[#1e1b4b] mb-1">{g.name}</Text>
-                                            {!isFree && <Ionicons name="lock-closed" size={12} color="#94a3b8" /> }
+                                            <View className="flex-row items-center justify-center">
+                                                <Text className="font-bold text-lg text-[#1e1b4b] mb-1">{g.name}</Text>
+                                                {!canPlay && <Ionicons name="lock-closed" size={14} color="#94a3b8" style={{ marginLeft: 4, marginBottom: 4 }} /> }
+                                            </View>
+                                            {!canPlay && <Text className="text-[10px] uppercase font-bold text-slate-400">Krefst Áskriftar</Text>}
                                             {isIssuingChallenge === g.id && <ActivityIndicator size="small" color="#1e1b4b" className="mt-2" />}
                                         </TouchableOpacity>
                                     )
