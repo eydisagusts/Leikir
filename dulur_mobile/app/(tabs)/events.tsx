@@ -169,7 +169,7 @@ export default function EventsScreen() {
                         {upcomingEvents.length > 0 && (
                             <View className="mt-14 px-2">
                                 <Text className="text-slate-500 font-black text-sm mb-6 uppercase tracking-[3px] pl-2">Næst Á Dagskrá</Text>
-                                {upcomingEvents.map((event, idx) => (
+                                {upcomingEvents.slice(0, 1).map((event, idx) => (
                                     <View key={event.id} className="flex-row items-center bg-slate-900/60 border border-white/5 p-5 rounded-[28px] mb-4 shadow-lg">
                                         <View className="bg-slate-800/80 w-14 h-14 items-center justify-center rounded-[20px] mr-5 border border-white/5">
                                             <Ionicons name="calendar" size={24} color="#64748b" />
