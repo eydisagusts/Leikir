@@ -1,22 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+
+const { width } = Dimensions.get('window');
 
 export default function EventsScreen() {
     const router = useRouter();
     const [activeEvent, setActiveEvent] = useState<any | null>(null);
-    const [upcomingEvent, setUpcomingEvent] = useState<any | null>(null);
+    const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    
+    const fadeAnim = useState(new Animated.Value(0))[0];
+    const slideAnim = useState(new Animated.Value(30))[0];
 
     useEffect(() => {
         const fetchEvents = async () => {
             const now = new Date().toISOString();
 
-            // Fetch Active Event
             let { data: activeData } = await supabase
                 .from('special_events')
                 .select('*')
@@ -25,7 +30,6 @@ export default function EventsScreen() {
                 .gte('end_date', now)
                 .order('start_date', { ascending: false });
 
-            // Fetch Upcoming Event
             let { data: upcomingData } = await supabase
                 .from('special_events')
                 .select('*')
@@ -33,100 +37,155 @@ export default function EventsScreen() {
                 .gt('start_date', now)
                 .order('start_date', { ascending: true });
 
-            // Filter for locales (defaulting to 'is' matching Web Logic)
             const activeEventMatched = activeData?.find(e => (e.modifiers?._locale || 'is') === 'is') || activeData?.[0] || null;
-            const upcomingEventMatched = upcomingData?.find(e => (e.modifiers?._locale || 'is') === 'is') || upcomingData?.[0] || null;
+            const upcomingMatched = upcomingData?.filter(e => (e.modifiers?._locale || 'is') === 'is') || upcomingData || [];
 
             setActiveEvent(activeEventMatched);
-            setUpcomingEvent(upcomingEventMatched);
+            setUpcomingEvents(upcomingMatched);
             setLoading(false);
+
+            Animated.parallel([
+                Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+                Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true })
+            ]).start();
         };
         fetchEvents();
     }, []);
 
+    const calculateProgress = (start: string, end: string) => {
+        const startDate = new Date(start).getTime();
+        const endDate = new Date(end).getTime();
+        const now = new Date().getTime();
+        const duration = endDate - startDate;
+        const elapsed = now - startDate;
+        let progress = Math.max(0, Math.min(100, (elapsed / duration) * 100));
+        return progress;
+    };
+
+    const handlePlayPress = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        if (activeEvent) {
+             router.push({ pathname: '/game/[id]', params: { id: activeEvent.id, isEvent: 'true' } as any });
+        }
+    };
+
     return (
-        <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top']}>
-            <View className="absolute inset-0 pointer-events-none">
-                <View className="absolute top-[-5%] left-[-20%] w-[300px] h-[300px] bg-indigo-500/15 rounded-full" />
-                <View className="absolute top-[15%] right-[-20%] w-[400px] h-[400px] bg-purple-500/15 rounded-full" />
-                <BlurView intensity={100} tint="light" className="absolute inset-0" />
+        <SafeAreaView className="flex-1 bg-black" edges={['top']}>
+            <LinearGradient
+                colors={['#0F172A', '#020617', '#000000']}
+                className="absolute inset-0"
+            />
+            
+            <View className="absolute top-0 w-full h-[60%] opacity-40 mix-blend-screen pointer-events-none">
+                <LinearGradient
+                    colors={['#4338ca', 'transparent']}
+                    className="absolute inset-0"
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                />
             </View>
 
-            <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-                
-                {/* Header */}
-                <View className="px-6 pt-16 pb-8 items-center justify-center relative z-10">
-                    <Text className="text-[52px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center uppercase">Viðburðir</Text>
-                    <Text className="text-[18px] font-medium font-serif italic text-slate-500 mt-2 tracking-wide text-center px-4">Mánaðarlegar áskoranir. Tvöfalt erfiðari, tvöfalt fleiri stig við sigur!</Text>
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                <View className="px-6 pt-10 pb-6">
+                    <Text className="text-4xl font-black text-white tracking-[2px] uppercase mb-1">Viðburðir</Text>
+                    <Text className="text-indigo-200/60 font-bold tracking-wide">Einkareknar áskoranir. Meiri stig.</Text>
                 </View>
 
                 {loading ? (
-                    <View className="flex-1 items-center justify-center pt-20">
-                        <ActivityIndicator size="large" color="#1e1b4b" />
+                    <View className="flex-1 items-center justify-center pt-32">
+                        <ActivityIndicator size="large" color="#818cf8" />
                     </View>
                 ) : (
-                    <View className="px-5 w-full self-center max-w-[600px] relative z-10 gap-6">
-                        
-                        {/* Current Event Card */}
+                    <Animated.View 
+                        className="px-5 w-full max-w-[600px] self-center"
+                        style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+                    >
                         {activeEvent ? (
-                            <View className="bg-white border border-white/60 rounded-[32px] p-8 overflow-hidden" style={{ elevation: 10, shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20 }}>
-                                <View className="flex-row items-center justify-between mb-6">
-                                    <View className="w-14 h-14 bg-indigo-50/80 rounded-2xl items-center justify-center border border-indigo-100">
-                                        <Ionicons name="star" size={28} color="#6366f1" />
-                                    </View>
-                                    <View className="bg-indigo-100 px-3 py-1.5 rounded-full">
-                                        <Text className="text-indigo-700 font-bold text-[12px] uppercase tracking-widest">Í gangi núna!</Text>
-                                    </View>
-                                </View>
+                            <View className="rounded-[40px] overflow-hidden bg-slate-900 border border-white/10 shadow-2xl" style={{ shadowColor: '#6366f1', shadowOpacity: 0.3, shadowRadius: 30, shadowOffset: { width: 0, height: 20 }}}>
+                                <LinearGradient
+                                    colors={['rgba(99, 102, 241, 0.25)', 'rgba(2, 6, 23, 0.95)']}
+                                    className="absolute inset-0"
+                                />
                                 
-                                <Text className="font-serif font-black text-3xl text-[#1e1b4b] mb-3 tracking-tight">{activeEvent.title}</Text>
-                                <Text className="text-slate-500 font-medium text-[16px] mb-8 leading-6">{activeEvent.description}</Text>
-                                
-                                <View className="bg-indigo-50 border border-indigo-100/50 px-5 py-4 rounded-[20px] flex-row items-center">
-                                    <Ionicons name="time-outline" size={22} color="#4f46e5" />
-                                    <Text className="ml-3 font-bold text-indigo-900 text-[15px]">
-                                        Lýkur {new Date(activeEvent.end_date).toLocaleDateString('is-IS')}
-                                    </Text>
-                                </View>
+                                <View className="p-8">
+                                    <View className="flex-row items-center justify-between mb-8">
+                                        <View className="bg-indigo-500/20 p-3 rounded-2xl border border-indigo-400/30">
+                                            <Ionicons name="flash" size={26} color="#c7d2fe" />
+                                        </View>
+                                        <View className="bg-indigo-500/90 px-4 py-1.5 rounded-full shadow-lg shadow-indigo-500/50 border border-indigo-400/50">
+                                            <Text className="text-white font-black text-[11px] uppercase tracking-[2px]">Í Gangi Núna</Text>
+                                        </View>
+                                    </View>
 
-                                <TouchableOpacity 
-                                    className="w-full bg-indigo-600 rounded-2xl py-4 mt-6 flex-row items-center justify-center shadow-lg shadow-indigo-600/30"
-                                    onPress={() => router.push({ pathname: '/game/[id]', params: { id: activeEvent.id, isEvent: 'true' } as any })}
-                                >
-                                    <Text className="text-white font-black uppercase tracking-widest text-[15px]">Spila áskorun</Text>
-                                    <Ionicons name="arrow-forward" size={18} color="white" className="ml-2" />
-                                </TouchableOpacity>
+                                    <Text className="font-serif font-black text-[44px] leading-[48px] text-white tracking-tighter mb-5 shadow-sm">
+                                        {activeEvent.title}
+                                    </Text>
+                                    <Text className="text-slate-300 font-medium text-[16px] leading-7 mb-8 opacity-90">
+                                        {activeEvent.description}
+                                    </Text>
+
+                                    <View className="mb-10 p-5 bg-black/40 rounded-3xl border border-white/5">
+                                        <View className="flex-row justify-between mb-3">
+                                            <Text className="text-slate-400 font-bold text-[11px] uppercase tracking-widest">Tími Eftir</Text>
+                                            <Text className="text-indigo-300 font-bold text-[11px] uppercase tracking-widest">
+                                                {new Date(activeEvent.end_date).toLocaleDateString('is-IS')}
+                                            </Text>
+                                        </View>
+                                        <View className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-white/5 shadow-inner">
+                                            <LinearGradient
+                                                colors={['#818cf8', '#6366f1']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                                style={{ width: `${calculateProgress(activeEvent.start_date, activeEvent.end_date)}%`, height: '100%', borderRadius: 999 }}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <TouchableOpacity 
+                                        activeOpacity={0.8}
+                                        onPress={handlePlayPress}
+                                    >
+                                        <LinearGradient
+                                            colors={['#6366f1', '#4338ca']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            className="w-full rounded-[24px] py-5 flex-row items-center justify-center border border-indigo-400/40 shadow-xl"
+                                        >
+                                            <Text className="text-white font-black uppercase tracking-[3px] text-[16px] drop-shadow-md">Spila Áskorun</Text>
+                                            <Ionicons name="play" size={18} color="white" style={{ marginLeft: 8 }} />
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         ) : (
-                            <View className="bg-white/50 border border-[#D3D6DA]/30 rounded-[32px] p-8 items-center">
-                                <Text className="text-slate-400 font-bold text-center">Enginn viðburður í gangi í augnablikinu.</Text>
+                            <View className="rounded-[40px] bg-slate-900 border border-white/5 p-12 items-center justify-center mt-2 shadow-xl">
+                                <View className="bg-slate-800 p-6 rounded-full border border-white/5 mb-6">
+                                    <Ionicons name="moon" size={48} color="#475569" />
+                                </View>
+                                <Text className="text-slate-400 font-bold text-lg text-center leading-7">Engar áskoranir{'\n'}í gangi í augnablikinu.</Text>
                             </View>
                         )}
-
-                        {/* Upcoming Event Card */}
-                        {upcomingEvent && (
-                            <View className="bg-white/80 border border-[#D3D6DA]/50 rounded-[32px] p-8 mt-2 opacity-95" style={{ shadowColor: '#a855f7', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 }}>
-                                <View className="flex-row items-center justify-between mb-6">
-                                    <View className="w-14 h-14 bg-purple-50/80 rounded-2xl items-center justify-center border border-purple-100">
-                                        <Ionicons name="calendar-clear" size={28} color="#a855f7" />
+                        
+                        {upcomingEvents.length > 0 && (
+                            <View className="mt-14 px-2">
+                                <Text className="text-slate-500 font-black text-sm mb-6 uppercase tracking-[3px] pl-2">Næst Á Dagskrá</Text>
+                                {upcomingEvents.map((event, idx) => (
+                                    <View key={event.id} className="flex-row items-center bg-slate-900/60 border border-white/5 p-5 rounded-[28px] mb-4 shadow-lg">
+                                        <View className="bg-slate-800/80 w-14 h-14 items-center justify-center rounded-[20px] mr-5 border border-white/5">
+                                            <Ionicons name="calendar" size={24} color="#64748b" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-slate-200 font-bold text-lg mb-1">{event.title}</Text>
+                                            <Text className="text-indigo-400/80 font-bold text-sm uppercase tracking-wider">
+                                                Byrjar {new Date(event.start_date).toLocaleDateString('is-IS')}
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <View className="bg-purple-100 px-3 py-1.5 rounded-full">
-                                        <Text className="text-purple-700 font-bold text-[12px] uppercase tracking-widest">Næsti viðburður</Text>
-                                    </View>
-                                </View>
-                                
-                                <Text className="font-serif font-black text-2xl text-[#1e1b4b] mb-3 tracking-tight opacity-90">{upcomingEvent.title}</Text>
-                                <Text className="text-slate-500 font-medium text-[15px] mb-8 leading-6 opacity-80">{upcomingEvent.description}</Text>
-                                
-                                <View className="bg-slate-50 border border-slate-200/60 px-5 py-4 rounded-[20px] flex-row items-center">
-                                    <Ionicons name="calendar-outline" size={22} color="#64748b" />
-                                    <Text className="ml-3 font-bold text-slate-700 text-[15px]">
-                                        Byrjar {new Date(upcomingEvent.start_date).toLocaleDateString('is-IS')}
-                                    </Text>
-                                </View>
+                                ))}
                             </View>
                         )}
-                    </View>
+                        
+                    </Animated.View>
                 )}
             </ScrollView>
         </SafeAreaView>
