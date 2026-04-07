@@ -1,0 +1,21 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "../dulur_global/src/*",
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "../dulur_global/src/lib/games/**/*.ts",
+    "../dulur_global/src/lib/games/**/*.tsx",
+    "nativewind-env.d.ts"
+  ]
+}
