@@ -229,7 +229,7 @@ export async function declineChallenge(challengeId: string) {
 
     const { error } = await supabase
         .from('challenges')
-        .update({ status: 'declined', updated_at: new Date().toISOString() })
+        .delete()
         .eq('id', challengeId)
         .eq('challenged_id', user.id)
         .eq('status', 'pending');

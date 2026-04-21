@@ -7,11 +7,12 @@ import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, withRepeat, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 
 interface Category {
-    title: string;
+    category: string;
     words: string[];
     difficulty: number;
 }
@@ -30,8 +31,37 @@ export default function NativeTengingar() {
 
     const [earnedXp, setEarnedXp] = useState<number>(0);
     const [showFlyXp, setShowFlyXp] = useState(false);
+    const [isFreshGameOver, setIsFreshGameOver] = useState(false);
+
     const xpAnimY = useSharedValue(0);
     const xpAnimOpacity = useSharedValue(0);
+
+    const handleCloseModal = () => {
+        setIsFreshGameOver(false);
+        if (earnedXp && earnedXp > 0) {
+            setShowFlyXp(true);
+            xpAnimY.value = 0;
+            xpAnimOpacity.value = 1;
+            xpAnimY.value = withTiming(-350, { duration: 1200 });
+            xpAnimOpacity.value = withTiming(0, { duration: 1200 });
+            setTimeout(() => {
+                setShowFlyXp(false);
+                DeviceEventEmitter.emit('xp-earned', earnedXp);
+            }, 1300);
+        }
+    };
+
+    const handleShare = async () => {
+        const header = `Dulur: Tengingar 🧩`;
+        const xpText = earnedXp ? `\n⭐ XP: +${earnedXp}` : '';
+        const mText = `Mistök: ${mistakes}/4`;
+        const message = `${header}\n${mText}${xpText}\n\nÉg fann allar tengingarnar!\ndulur.is 🔥`;
+        try {
+            await Share.share({ message });
+        } catch (error) {
+            console.error('Error sharing', error);
+        }
+    };
 
     const xpFloatingStyle = useAnimatedStyle(() => {
         return {
@@ -47,22 +77,35 @@ export default function NativeTengingar() {
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/tengingar/init`);
-                if (!res.ok) throw new Error('API down');
-                const data = await res.json();
-                
+                const today = new Date().toISOString().split('T')[0];
+
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/tengingar/init`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'tengingar').maybeSingle(),
+                    supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', 'tengingar').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [data, [stateDataRes, resDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
+
                 setCategories(data.categories);
                 
-                const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
                     setUnsolvedWords(data.startingBoard);
                     setGameState('playing'); 
                     return; 
                 }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'tengingar').single();
-                
+                const stateData = stateDataRes.data;
+                const resData = resDataRes.data;
+
                 let currentUnsolved = data.startingBoard;
                 let currentSolved: Category[] = [];
                 let currentMistakes = 0;
@@ -72,8 +115,6 @@ export default function NativeTengingar() {
                     currentSolved = stateData.state_json.solvedCategories || [];
                     currentMistakes = stateData.state_json.mistakes || 0;
                 }
-
-                const { data: resData } = await supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', 'tengingar').gte('played_at', `${today}T00:00:00Z`).single();
                 if (resData) {
                     setGameState(resData.won ? 'won' : 'lost');
                     setSolvedCategories(data.categories);
@@ -230,20 +271,12 @@ export default function NativeTengingar() {
 
         if (won) {
             setEarnedXp(xpReward);
-            setTimeout(() => {
-                setShowFlyXp(true);
-                xpAnimY.value = 0;
-                xpAnimOpacity.value = 1;
-                xpAnimY.value = withTiming(-350, { duration: 1200 });
-                xpAnimOpacity.value = withTiming(0, { duration: 1200 });
-                setTimeout(() => {
-                    setShowFlyXp(false);
-                    DeviceEventEmitter.emit('xp-earned', xpReward);
-                }, 1300);
-            }, 800);
-
+            setTimeout(() => setIsFreshGameOver(true), 1000);
             await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
             await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        } else {
+            setEarnedXp(0);
+            setTimeout(() => setIsFreshGameOver(true), 1000);
         }
     };
 
@@ -278,12 +311,25 @@ export default function NativeTengingar() {
             >
             
             {showFlyXp && (
-                <Animated.View style={[xpFloatingStyle, { position: 'absolute', top: '40%', left: '40%', zIndex: 100 }]} className="items-center pointer-events-none">
-                    <View className="bg-green-500 px-4 py-2 rounded-full shadow-lg border border-green-400">
-                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp} XP!</Text>
+                <Animated.View style={[xpFloatingStyle, { position: 'absolute', top: '40%', left: '35%', zIndex: 100 }]} className="items-center pointer-events-none">
+                    <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                        <Ionicons name="star" size={16} color="white" />
+                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                     </View>
                 </Animated.View>
             )}
+
+            <NativeGameEndModal
+                gameTitle="Tengingar"
+                visible={gameState !== 'playing' && isFreshGameOver}
+                gameState={gameState}
+                xpEarned={earnedXp}
+                winTitle={gameState === 'won' ? 'Vel gert!' : 'Leik lokið'}
+                winDesc={gameState === 'won' ? 'Þú fannst allar tengingarnar!' : 'Þú kláraðir allar tilraunir þínar.'}
+                onContinue={handleCloseModal}
+                primaryButtonText="Deila niðurstöðu"
+                onPrimaryAction={handleShare}
+            />
 
             {toast && (
                 <View className="absolute top-4 self-center z-50 bg-[#1A1A1B] px-6 py-3 rounded-full shadow-lg">
@@ -296,13 +342,13 @@ export default function NativeTengingar() {
                 {/* Solved Categories */}
                 {solvedCategories.map(cat => (
                     <Animated.View 
-                        key={cat.title} 
+                        key={cat.category} 
                         entering={FadeIn} 
                         layout={Layout.springify()} 
                         style={{ backgroundColor: getDifficultyColor(cat.difficulty) }}
                         className="w-full py-4 px-2 rounded-xl items-center justify-center mb-2 shadow-sm"
                     >
-                        <Text className="font-bold text-[#1A1A1B] uppercase tracking-widest mb-1 text-center">{cat.title}</Text>
+                        <Text className="font-bold text-[#1A1A1B] uppercase tracking-widest mb-1 text-center">{cat.category}</Text>
                         <Text className="text-[#1A1A1B] uppercase text-xs font-semibold text-center">{cat.words.join(', ')}</Text>
                     </Animated.View>
                 ))}
@@ -361,14 +407,14 @@ export default function NativeTengingar() {
                         </TouchableOpacity>
                     </View>
                 </View>
-            ) : (
+            ) : !isFreshGameOver ? (
                 <View className="w-full max-w-[500px] px-4 pb-12 mt-4 items-center">
-                     <Text className="text-xl font-bold font-serif mb-4 text-[#1A1A1B]">{gameState === 'won' ? 'Fullkomið!' : 'Næst gengur betur!'}</Text>
+                     <Text className="text-xl font-bold font-serif mb-4 text-[#1A1A1B]">{gameState === 'won' ? 'Leik lokið!' : 'Næst gengur betur!'}</Text>
                      <TouchableOpacity onPress={() => router.back()} className="px-8 py-4 rounded-full bg-[#1A1A1B] w-full max-w-[250px] items-center">
                         <Text className="font-bold text-white text-lg">Til baka í leiki</Text>
                     </TouchableOpacity>
                 </View>
-            )}
+            ) : null}
 
             </View>
 

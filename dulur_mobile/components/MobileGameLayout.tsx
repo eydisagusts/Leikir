@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, Modal, ScrollView, Animated as NativeAnimated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter, AppState, AppStateStatus } from 'react-native';
+import { Animated } from 'react-native';
 
 interface MobileGameLayoutProps {
     gameId: string;
@@ -26,10 +27,22 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
     const [totalXp, setTotalXp] = useState<number>(0);
     const [xpBounce, setXpBounce] = useState(false);
 
+    const xpScale = React.useRef(new Animated.Value(1)).current;
+
+    const xpStyle = {
+        transform: [{ scale: xpScale }]
+    };
+
     useEffect(() => {
         const sub = DeviceEventEmitter.addListener('xp-earned', (earned: number) => {
             setTotalXp(prev => prev + earned);
             setXpBounce(true);
+            
+            Animated.sequence([
+                Animated.timing(xpScale, { toValue: 1.3, duration: 150, useNativeDriver: true }),
+                Animated.timing(xpScale, { toValue: 1, duration: 250, useNativeDriver: true })
+            ]).start();
+            
             setTimeout(() => setXpBounce(false), 800);
         });
         return () => sub.remove();
@@ -41,36 +54,29 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 let leaderboardType = gameId;
                 if (gameId.startsWith('sudoku')) leaderboardType = 'sudoku';
 
-                // 1. Fetch Top 3 this month exactly for the current game variant
-                const { data: results, error: fetchErr } = await supabase.rpc('get_monthly_game_leaderboard', {
-                    p_game_type: leaderboardType,
-                    p_limit: 3
-                });
+                const { data: { user } } = await supabase.auth.getUser();
+
+                const [leaderboardRes, profileRes, myResultsRes] = await Promise.all([
+                    supabase.rpc('get_monthly_game_leaderboard', { p_game_type: leaderboardType, p_limit: 3 }),
+                    user ? supabase.from('profiles').select('xp').eq('id', user.id).single() : Promise.resolve({ data: null }),
+                    user ? supabase.from('game_results').select('won, time_taken_seconds').eq('user_id', user.id).eq('game_type', gameId) : Promise.resolve({ data: null })
+                ]);
                 
-                if (fetchErr) {
-                    console.log('Error fetching top3:', fetchErr);
+                if (leaderboardRes.error) {
+                    console.log('Error fetching top3:', leaderboardRes.error);
                 }
                 
-                if (results) setTop3(results);
+                if (leaderboardRes.data) setTop3(leaderboardRes.data);
 
-                // 2. Fetch current user stats & Total XP
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const { data: profile } = await supabase.from('profiles').select('xp').eq('id', user.id).single();
-                    if (profile) setTotalXp(profile.xp || 0);
-                    const { data: myResults } = await supabase
-                        .from('game_results')
-                        .select('won, time_taken_seconds')
-                        .eq('user_id', user.id)
-                        .eq('game_type', gameId);
-                    
-                    if (myResults && myResults.length > 0) {
-                        const played = myResults.length;
-                        const won = myResults.filter(r => r.won).length;
-                        const totalTime = myResults.reduce((acc, curr) => acc + (curr.time_taken_seconds || 0), 0);
-                        const avgTime = Math.round(totalTime / played);
-                        setStats({ played, won, avgTime });
-                    }
+                if (profileRes.data) setTotalXp(profileRes.data.xp || 0);
+
+                const myResults = myResultsRes.data;
+                if (myResults && myResults.length > 0) {
+                    const played = myResults.length;
+                    const won = myResults.filter(r => r.won).length;
+                    const totalTime = myResults.reduce((acc, curr) => acc + (curr.time_taken_seconds || 0), 0);
+                    const avgTime = Math.round(totalTime / played);
+                    setStats({ played, won, avgTime });
                 }
             } catch (error) {
                 console.error("Layout fetch failed:", error);
@@ -177,19 +183,25 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+        <View style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+
             <ScrollView 
                 contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 scrollEnabled={scrollEnabled}
             >
+                {/* Header Backdrop Gradient */}
+                <View className="absolute top-0 w-full h-[150px] opacity-40 mix-blend-multiply pointer-events-none">
+                    <View className="absolute inset-x-0 top-0 h-full bg-gradient-to-b from-indigo-50/80 to-transparent" />
+                </View>
+
                 {/* Header */}
-                <View className="flex-row items-center justify-between px-4 mt-6 pt-4 pb-2 w-full self-center max-w-[500px]">
+                <View className="flex-row items-center justify-between px-4 mt-6 pt-4 pb-2 w-full self-center max-w-[500px] z-10">
                     <View className="flex-1 items-start">
-                        <TouchableOpacity onPress={onBack} className="flex-row items-center bg-white border border-gray-200 px-3 py-1.5 rounded-[12px] shadow-sm">
-                            <Ionicons name="chevron-back" size={16} color="#64748b" />
-                            <Text className="text-sm font-bold text-slate-500 ml-1">Leikir</Text>
+                        <TouchableOpacity onPress={onBack} activeOpacity={0.7} className="flex-row items-center bg-white border border-slate-200/60 px-3.5 py-2 rounded-[16px] shadow-sm">
+                            <Ionicons name="chevron-back" size={18} color="#64748b" />
+                            <Text className="text-[15px] font-bold text-slate-500 ml-1 tracking-wide">Leikir</Text>
                         </TouchableOpacity>
                     </View>
                     
@@ -205,9 +217,11 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                     
                     <View className="flex-1 items-end justify-center">
                         {totalXp > 0 && (
-                            <View className={`flex-row items-center gap-1.5 bg-[#EAB308] border ${xpBounce ? 'border-[#FDE047] scale-105' : 'border-[#CA8A04]'} px-3 py-1.5 rounded-[12px] shadow-sm`}>
-                                <Ionicons name="star" size={12} color="white" />
-                                <Text className="text-white font-black text-xs">{totalXp}</Text>
+                            <View pointerEvents="none">
+                                <Animated.View style={[xpStyle]} className={`flex-row items-center gap-1.5 bg-[#EAB308] border ${xpBounce ? 'border-[#FDE047]' : 'border-[#CA8A04]'} px-3 py-1.5 rounded-[12px] shadow-sm`}>
+                                    <Ionicons name="star" size={12} color="white" />
+                                    <Text className="text-white font-black text-xs">{totalXp}</Text>
+                                </Animated.View>
                             </View>
                         )}
                     </View>
@@ -515,6 +529,6 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 </View>
             </Modal>
 
-        </SafeAreaView>
+        </View>
     );
 };

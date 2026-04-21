@@ -9,31 +9,47 @@ import { useColorScheme } from '@/components/useColorScheme';
 // Globally polyfill crypto before supabase loads
 import 'react-native-get-random-values';
 import { supabase } from '@/lib/supabase';
+import { Text, TextInput } from 'react-native';
 
 import { 
   useFonts,
   Inter_400Regular,
   Inter_500Medium,
-  Inter_700Bold
+  Inter_700Bold,
+  Inter_900Black
 } from '@expo-google-fonts/inter';
 import {
   PlayfairDisplay_400Regular,
   PlayfairDisplay_600SemiBold,
-  PlayfairDisplay_700Bold
+  PlayfairDisplay_700Bold,
+  PlayfairDisplay_900Black
 } from '@expo-google-fonts/playfair-display';
 
 export { ErrorBoundary } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
 
+// Inject Global Default Font to perfectly mirror the NextJS Web App 'Inter' Typography
+// @ts-ignore
+if (!Text.defaultProps) Text.defaultProps = {};
+// @ts-ignore
+Text.defaultProps.style = { ...Text.defaultProps?.style, fontFamily: 'Inter_400Regular' };
+
+// @ts-ignore
+if (!TextInput.defaultProps) TextInput.defaultProps = {};
+// @ts-ignore
+TextInput.defaultProps.style = { ...TextInput.defaultProps?.style, fontFamily: 'Inter_400Regular' };
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_700Bold,
+    Inter_900Black,
     PlayfairDisplay_400Regular,
     PlayfairDisplay_600SemiBold,
     PlayfairDisplay_700Bold,
+    PlayfairDisplay_900Black,
   });
 
   useEffect(() => {

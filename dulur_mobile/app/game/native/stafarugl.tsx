@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, PanResponder, DeviceEventEmitter } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, PanResponder, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 
@@ -72,6 +74,46 @@ export default function NativeStafarugl() {
     const [startPt, setStartPt] = useState<Point | null>(null);
     const [currentPath, setCurrentPath] = useState<Point[]>([]);
 
+    const [earnedXp, setEarnedXp] = useState<number | null>(null);
+    const [showFlyXp, setShowFlyXp] = useState(false);
+    const [isFreshGameOver, setIsFreshGameOver] = useState(false);
+
+    const xpAnimY = useSharedValue(0);
+    const xpAnimOpacity = useSharedValue(1);
+
+    const handleCloseModal = () => {
+        setIsFreshGameOver(false);
+        if (earnedXp && earnedXp > 0) {
+            setShowFlyXp(true);
+            xpAnimY.value = 0;
+            xpAnimOpacity.value = 1;
+            xpAnimY.value = withTiming(-350, { duration: 1200 });
+            xpAnimOpacity.value = withTiming(0, { duration: 1200 });
+            setTimeout(() => {
+                setShowFlyXp(false);
+                DeviceEventEmitter.emit('xp-earned', earnedXp);
+            }, 1300);
+        }
+    };
+
+    const flyStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateY: xpAnimY.value }],
+            opacity: xpAnimOpacity.value,
+        };
+    });
+
+    const handleShare = async () => {
+        const header = `Dulur: Stafarugl 🔠`;
+        const xpText = earnedXp ? `\n⭐ XP: +${earnedXp}` : '';
+        const message = `${header}\n${xpText}\n\nÉg fann öll orðin!\ndulur.is 🔥`;
+        try {
+            await Share.share({ message });
+        } catch (error) {
+            console.error('Error sharing', error);
+        }
+    };
+
     // Measurement
     const [gridLayout, setGridLayout] = useState({ pageX: 0, pageY: 0, width: 0, height: 0 });
     const gridRef = useRef<View>(null);
@@ -79,26 +121,38 @@ export default function NativeStafarugl() {
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/stafarugl/init`);
-                if (!res.ok) throw new Error('API down');
-                const data = await res.json();
-                
+                const today = new Date().toISOString().split('T')[0];
+
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/stafarugl/init`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'stafarugl').maybeSingle(),
+                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'stafarugl').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [data, [stateDataRes, resDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
+
                 setTargetWords(data.targetWords);
                 setGrid(data.grid);
                 setPlacements(data.placements);
                 
-                const { data: { user } } = await supabase.auth.getUser();
                 if (!user) { setGameState('playing'); return; }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'stafarugl').single();
+                const stateData = stateDataRes.data;
+                const resData = resDataRes.data;
                 
                 if (stateData && stateData.updated_at.startsWith(today)) {
                     setFoundWords(stateData.state_json.foundWords || []);
                     setFoundPaths(stateData.state_json.foundPaths || []);
                 }
 
-                const { data: resData } = await supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'stafarugl').gte('played_at', `${today}T00:00:00Z`).single();
                 if (resData) {
                     setGameState('won');
                     setFoundWords([...data.targetWords]);
@@ -123,11 +177,9 @@ export default function NativeStafarugl() {
     const getCellFromEvent = (locationX: number, locationY: number): Point | null => {
         if (!grid || grid.length === 0 || gridLayout.width === 0) return null;
         
-        let dx = locationX;
-        let dy = locationY;
-
-        // Clip to bounds strictly to the touch target
-        if (dx < 0 || dy < 0 || dx > gridLayout.width || dy > gridLayout.height) return null;
+        // Clamp coordinates to allow forgiving drag around the edges including bottom row
+        let dx = Math.max(0, Math.min(locationX, gridLayout.width - 0.1));
+        let dy = Math.max(0, Math.min(locationY, gridLayout.height - 0.1));
 
         const cellW = gridLayout.width / grid[0].length;
         const cellH = gridLayout.height / grid.length;
@@ -229,6 +281,8 @@ export default function NativeStafarugl() {
         if (!user) return;
 
         const xpReward = 100;
+        setEarnedXp(xpReward);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
         await supabase.from('game_results').insert({
             time_taken_seconds: 60,
             user_id: user.id,
@@ -275,14 +329,23 @@ return (
             <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
             <MobileGameLayout onBack={() => router.back()} gameId="stafarugl" gameTitle="Stafarugl" scrollEnabled={false} isGameOver={gameState !== 'playing'}>
 
-            {gameState === 'won' && !isDragging && (
-                 <View className="absolute top-1/2 -translate-y-1/2 self-center bg-white/95 px-8 py-6 rounded-2xl shadow-xl items-center z-50 w-[85%] border border-[#D3D6DA]">
-                    <Text className="text-2xl font-bold text-[#1A1A1B] font-serif">Snilld!</Text>
-                    <Text className="mt-2 text-base text-gray-600 text-center mb-6">Þú fannst öll NÚNA orðin í stafaruglinu.</Text>
-                    <TouchableOpacity onPress={() => router.back()} className="bg-[#1A1A1B] px-8 py-3.5 rounded-full shadow-md w-full items-center">
-                        <Text className="text-white font-bold text-lg">Til baka</Text>
-                    </TouchableOpacity>
-                </View>
+            <NativeGameEndModal
+                gameTitle="Stafarugl"
+                visible={gameState === 'won' && isFreshGameOver}
+                gameState="won"
+                xpEarned={earnedXp}
+                winTitle="Vel gert!"
+                winDesc="Þú fannst öll orðin í stafaruglinu."
+                onContinue={handleCloseModal}
+            />
+
+            {showFlyXp && earnedXp !== null && earnedXp > 0 && (
+                <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
+                    <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                        <Ionicons name="star" size={16} color="white" />
+                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
+                    </View>
+                </Animated.View>
             )}
 
             <View className="w-full flex-1 justify-start items-center mt-4">

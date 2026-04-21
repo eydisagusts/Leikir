@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,7 +52,7 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
             </View>
         );
     }
-    
+
     if (type === 'hengimadur') {
         return (
             <View className="absolute inset-0 bg-[#EBF0F5] items-center justify-center">
@@ -71,7 +71,7 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
             <View className="absolute inset-0 bg-[#F2F2F2] items-center justify-center">
                 <View className="w-[65%] aspect-square max-w-[105px] bg-white rounded-lg shadow-sm flex-row flex-wrap border border-black/5 overflow-hidden" style={{ elevation: 2 }}>
                     <Svg style={{ position: 'absolute', zIndex: 0 }} className="w-full h-full" viewBox="0 0 100 100">
-                        <Path d="M12.5 87.5 L87.5 12.5" fill="none" stroke="#E3E3E3" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
+                        <Path d="M12.5 87.5 L87.5 12.5" fill="none" stroke="#E3E3E3" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
                     </Svg>
                     {letters.map((l, i) => (
                         <View key={i} style={{ width: '25%', height: '25%', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
@@ -88,10 +88,10 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
             <View className="absolute inset-0 bg-[#E8E6E3] items-center justify-center">
                 <View className="w-[70%] max-w-[100px] justify-between h-[60%] py-2">
                     {['#F2C960', '#A0C35A', '#B1C4E0', '#BA81C5'].map((color, i) => (
-                        <View key={i} style={{ backgroundColor: color, height: '21%', borderRadius: 4, elevation: 1, shadowColor:'#000', shadowOpacity:0.05, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2 }}/>
-                            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2 }}/>
-                            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2 }}/>
+                        <View key={i} style={{ backgroundColor: color, height: '21%', borderRadius: 4, elevation: 1, shadowColor: '#000', shadowOpacity: 0.05, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2 }} />
+                            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2 }} />
+                            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2 }} />
                         </View>
                     ))}
                 </View>
@@ -114,7 +114,7 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
                                 const isBottomThick = r % 3 === 2 && r !== 8;
                                 const isRightThick = c % 3 === 2 && c !== 8;
                                 return (
-                                    <View 
+                                    <View
                                         key={`c-${c}`}
                                         style={{
                                             flex: 1,
@@ -144,9 +144,9 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
                     {Array.from({ length: 35 }).map((_, i) => {
                         const isBlack = [3, 6, 12, 17, 21, 27, 33].includes(i);
                         const isYellow = i === 18;
-                        const label = {0:'1',1:'2',2:'3',4:'4',5:'5',8:'6',11:'7',15:'8',19:'9',23:'10',26:'11',30:'12'};
+                        const label = { 0: '1', 1: '2', 2: '3', 4: '4', 5: '5', 8: '6', 11: '7', 15: '8', 19: '9', 23: '10', 26: '11', 30: '12' };
                         return (
-                            <View key={i} style={{ width: '14%', height: '19%', backgroundColor: isBlack ? 'black' : isYellow ? '#FFF4B3' : 'white', borderWidth: 0.5, borderColor: '#555', position: 'relative', alignItems:'center', justifyContent:'center' }}>
+                            <View key={i} style={{ width: '14%', height: '19%', backgroundColor: isBlack ? 'black' : isYellow ? '#FFF4B3' : 'white', borderWidth: 0.5, borderColor: '#555', position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
                                 {/* @ts-ignore */}
                                 {!isBlack && label[i] && <Text style={{ position: 'absolute', top: 1, left: 1, fontSize: 4, color: '#333' }}>{label[i]}</Text>}
                                 {isYellow && <Text style={{ fontFamily: 'serif', fontWeight: '900', color: 'black', fontSize: 10 }}>K</Text>}
@@ -163,16 +163,16 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
         const highs = [0, 1, 5, 6, 10, 11];
         return (
             <View className="absolute inset-0 bg-[#E5F1F1] items-center justify-center">
-                 <View className="w-[65%] aspect-square max-w-[105px] bg-white rounded-xl shadow border border-black/5 flex-row flex-wrap overflow-hidden" style={{ elevation: 2 }}>
+                <View className="w-[65%] aspect-square max-w-[105px] bg-white rounded-xl shadow border border-black/5 flex-row flex-wrap overflow-hidden" style={{ elevation: 2 }}>
                     <Svg style={{ position: 'absolute', zIndex: 0 }} className="w-full h-full" viewBox="0 0 100 100">
-                        <Path d="M12.5 12.5 L37.5 12.5 L37.5 37.5 L62.5 37.5 L62.5 62.5 L87.5 62.5" fill="none" stroke="#BFE5E3" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
+                        <Path d="M12.5 12.5 L37.5 12.5 L37.5 37.5 L62.5 37.5 L62.5 62.5 L87.5 62.5" fill="none" stroke="#BFE5E3" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
                     </Svg>
                     {letters.map((l, i) => (
                         <View key={i} style={{ width: '25%', height: '25%', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
                             <Text style={{ fontWeight: 'black', fontSize: 13, color: highs.includes(i) ? '#1E3F32' : '#88AFA0' }}>{l}</Text>
                         </View>
                     ))}
-                 </View>
+                </View>
             </View>
         );
     }
@@ -185,13 +185,13 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
                         const isRedMine = i === 12;
                         const isRevMine = i === 3 || i === 24;
                         const isRevBlank = [6, 7, 8, 11, 13, 16, 17, 18].includes(i);
-                        let num = ''; if(i===7)num='1'; if(i===8)num='2'; if(i===11)num='3'; if(i===13)num='2'; if(i===17)num='1';
-                        
-                        let style: any = { width: '20%', height: '20%', borderWidth: 0.5, borderColor: '#aaa', alignItems:'center', justifyContent:'center' };
+                        let num = ''; if (i === 7) num = '1'; if (i === 8) num = '2'; if (i === 11) num = '3'; if (i === 13) num = '2'; if (i === 17) num = '1';
+
+                        let style: any = { width: '20%', height: '20%', borderWidth: 0.5, borderColor: '#aaa', alignItems: 'center', justifyContent: 'center' };
                         if (isRedMine) { style.backgroundColor = '#ef4444'; }
                         else if (isRevMine || isRevBlank) { style.backgroundColor = '#F0F0F0'; style.borderColor = 'rgba(0,0,0,0.1)'; }
                         else {
-                            style.backgroundColor = '#D0D0D0'; 
+                            style.backgroundColor = '#D0D0D0';
                             style.borderTopWidth = 1.5; style.borderLeftWidth = 1.5; style.borderTopColor = 'white'; style.borderLeftColor = 'white';
                         }
                         return (
@@ -228,15 +228,15 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
             </View>
         );
     }
-    
+
     if (type === 'minnisspil') {
         return (
             <View className="absolute inset-0 bg-[#DDF4FD] items-center justify-center">
                 <View className="w-[60%] max-w-[100px] aspect-square flex-row flex-wrap justify-between" style={{ alignContent: 'space-between' }}>
                     {Array.from({ length: 4 }).map((_, i) => (
-                         <View key={i} className="w-[45%] h-[45%] bg-white rounded flex items-center justify-center border border-black/5 shadow-sm" style={{ elevation: 1 }}>
-                             {i === 1 || i === 2 ? <Ionicons name="star" size={16} color="#0EA5E9" /> : null}
-                         </View>
+                        <View key={i} className="w-[45%] h-[45%] bg-white rounded flex items-center justify-center border border-black/5 shadow-sm" style={{ elevation: 1 }}>
+                            {i === 1 || i === 2 ? <Ionicons name="star" size={16} color="#0EA5E9" /> : null}
+                        </View>
                     ))}
                 </View>
             </View>
@@ -247,28 +247,28 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
 });
 
 // Extracted and Memoized card component prevents destructive list re-renders
-const GameCard = React.memo(({ 
-    game, 
-    isSubscribed, 
-    onPress 
-}: { 
-    game: typeof GAMES[0], 
-    isSubscribed: boolean, 
-    onPress: (id: string) => void 
+const GameCard = React.memo(({
+    game,
+    isSubscribed,
+    onPress
+}: {
+    game: typeof GAMES[0],
+    isSubscribed: boolean,
+    onPress: (id: string) => void
 }) => {
     const showBadge = game.badge && !isSubscribed;
     return (
-        <TouchableOpacity 
+        <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => onPress(game.id)}
             className="w-[48%] mb-8"
         >
-            <View 
-                className="w-full aspect-[4/3] bg-white rounded-3xl border border-black/5 shadow-sm mb-3.5 overflow-hidden justify-center items-center" 
+            <View
+                className="w-full aspect-[4/3] bg-white rounded-3xl border border-black/5 shadow-sm mb-3.5 overflow-hidden justify-center items-center"
                 style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 6 }, shadowRadius: 10 }}
             >
                 <GameGraphic type={game.iconType} />
-                
+
                 {showBadge && (
                     <View className="absolute top-2.5 right-2.5 bg-[#1e1b4b] px-2 py-1 rounded-[6px] shadow-sm flex-row items-center gap-1.5" style={{ elevation: 2 }}>
                         <Ionicons name="star" size={8} color="#EAB308" />
@@ -276,7 +276,7 @@ const GameCard = React.memo(({
                     </View>
                 )}
             </View>
-            
+
             <View className="px-1">
                 <Text className="text-[18px] font-black font-serif tracking-tight text-[#1e1b4b] leading-tight">{game.name}</Text>
                 <Text className="text-[12px] font-medium text-slate-500 tracking-normal leading-snug mt-1.5" numberOfLines={2}>{game.desc}</Text>
@@ -290,16 +290,26 @@ const GameCard = React.memo(({
 export default function HomeHubScreen() {
     const insets = useSafeAreaInsets();
     const [isSubscribed, setIsSubscribed] = useState(false);
-    
+    const [xp, setXp] = useState(0);
+    const [xpBounce, setXpBounce] = useState(false);
+
     useEffect(() => {
         async function fetchSub() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data } = await supabase.from('profiles').select('is_subscribed').eq('id', user.id).single();
+                const { data } = await supabase.from('profiles').select('is_subscribed, xp').eq('id', user.id).single();
                 if (data?.is_subscribed) setIsSubscribed(true);
+                if (data?.xp) setXp(data.xp);
             }
         }
         fetchSub();
+
+        const sub = DeviceEventEmitter.addListener('xp-earned', (earned: number) => {
+            setXp(prev => prev + earned);
+            setXpBounce(true);
+            setTimeout(() => setXpBounce(false), 800);
+        });
+        return () => sub.remove();
     }, []);
 
     const handleGamePress = React.useCallback((id: string) => {
@@ -313,23 +323,38 @@ export default function HomeHubScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <ScrollView className="flex-1 bg-[#FAFAFA]" contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-                
+
                 {/* Header & Motto (Centered 2026 Home Page Style) */}
-                <View className="px-6 pt-16 pb-12 items-center justify-center">
-                    <Text className="text-[52px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center">Dulur.</Text>
-                    <Text className="text-[20px] font-medium font-serif italic text-slate-500 mt-2 tracking-wide text-center">Mundu að leika.</Text>
+                <View className="w-full relative px-6 pt-12 pb-10 flex-col items-center justify-center">
+                    {/* XP absolutely positioned but matching the visual line of the title */}
+                    <View className="absolute top-16 right-6 z-10">
+                        {xp > 0 && (
+                            <View className={`flex-row items-center gap-1.5 bg-[#EAB308] border ${xpBounce ? 'border-[#FDE047]' : 'border-[#CA8A04]'} px-3 py-1.5 rounded-[12px] shadow-sm`} style={{ transform: [{ scale: xpBounce ? 1.05 : 1 }] }}>
+                                <Ionicons name="star" size={14} color="white" />
+                                <Text className="text-white font-black text-[13px]">{xp}</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <Text
+                        className="text-[52px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center mb-1"
+                        style={{ textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
+                    >
+                        Dulur.
+                    </Text>
+                    <Text className="text-[24px] font-bold font-serif italic text-slate-800 tracking-wide text-center">Mundu að leika.</Text>
                 </View>
 
                 {/* Allir Leikir Divider */}
                 <View className="px-6 mb-6 flex-row items-center gap-3">
-                    <Text className="text-[22px] font-black font-serif text-[#1e1b4b] tracking-tight uppercase">Allir Leikir</Text>
+                    <Text className="text-[22px] font-black font-serif text-[#1e1b4b] tracking-tight">Allir Leikir</Text>
                     <View className="flex-1 h-[2px] bg-indigo-900/5 rounded-full" />
                 </View>
 
                 {/* 2026 Grid Aesthetics for Games */}
                 <View className="px-5 flex-row flex-wrap justify-between">
                     {GAMES.map((game) => (
-                        <GameCard 
+                        <GameCard
                             key={game.id}
                             game={game}
                             isSubscribed={isSubscribed}

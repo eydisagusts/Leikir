@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    Text, TextInput {
+        font-family: 'Inter_400Regular';
+    }
+}
+
 @layer utilities {
+    .font-sans, .font-normal {
+        font-family: 'Inter_400Regular' !important;
+    }
+    .font-medium {
+        font-family: 'Inter_500Medium' !important;
+    }
+    .font-semibold {
+        font-family: 'Inter_700Bold' !important;
+    }
+    .font-bold {
+        font-family: 'Inter_700Bold' !important;
+    }
+    .font-black {
+        font-family: 'Inter_900Black' !important;
+    }
+    .font-serif {
+        font-family: 'PlayfairDisplay_400Regular' !important;
+    }
+    .font-serif.font-bold {
+        font-family: 'PlayfairDisplay_700Bold' !important;
+    }
+    .font-serif.font-black {
+        font-family: 'PlayfairDisplay_900Black' !important;
+    }
+
     /* We can place shared custom utilities from Next.js here later if needed */
 }

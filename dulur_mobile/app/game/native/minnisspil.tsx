@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, Animated as RNAnimated } from 'react-native';
 import { Stack, router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter, Share } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import { supabase } from '@/lib/supabase';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
@@ -138,38 +140,50 @@ export default function NativeMinnisspil() {
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/minnisspil/init`);
-                if (!res.ok) throw new Error('API down');
-                const data: MinnisspilGameData = await res.json();
-                setGame(data);
+                const today = new Date().toISOString().split('T')[0];
                 
-                const { data: { user } } = await supabase.auth.getUser();
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/minnisspil/init`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_results')
+                        .select('score')
+                        .eq('user_id', user.id)
+                        .eq('game_type', 'minnisspil')
+                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'minnisspil').maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [data, [resDataRes, stateDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
+
+                setGame(data as MinnisspilGameData);
+                
                 if (!user) {
                     setGameState('playing');
                     return;
                 }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: resData } = await supabase.from('game_results')
-                    .select('score')
-                    .eq('user_id', user.id)
-                    .eq('game_type', 'minnisspil')
-                    .gte('played_at', `${today}T00:00:00Z`).single();
-                
+                const resData = resDataRes.data;
+                const stateData = stateDataRes.data;
+
+                if (stateData && stateData.state_json && stateData.updated_at.startsWith(today)) {
+                    setTurns(stateData.state_json.turns || 0);
+                    setMistakes(stateData.state_json.mistakes || 0);
+                    setMatchedIcons(stateData.state_json.matchedIcons || []);
+                    setFlippedIndices(stateData.state_json.flippedIndices || []);
+                } else if (stateData) {
+                    // Removed game_states deletion to preserve state for replay visualization
+                }
+
                 if (resData) {
                     setGameState('won');
-                    setTurns(0); 
-                    setMatchedIcons(data.cards.map(c => c.iconId as string));
                 } else {
-                    const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'minnisspil').single();
-                    if (stateData && stateData.state_json && stateData.updated_at.startsWith(today)) {
-                        setTurns(stateData.state_json.turns || 0);
-                        setMistakes(stateData.state_json.mistakes || 0);
-                        setMatchedIcons(stateData.state_json.matchedIcons || []);
-                        setFlippedIndices(stateData.state_json.flippedIndices || []);
-                    } else if (stateData) {
-                        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', 'minnisspil');
-                    }
                     // Timer will start on first interaction
                     setGameState('playing');
                 }
@@ -188,7 +202,7 @@ export default function NativeMinnisspil() {
         if (!user) return;
 
         let elapsed = 0;
-        const date = new Date().toLocaleDateString('en-CA');
+        const date = new Date().toISOString().split('T')[0];
         const key = `timer_${user.id}_minnisspil_${date}`;
         const savedTime = await AsyncStorage.getItem(key);
         if (savedTime) elapsed = parseInt(savedTime, 10);
@@ -210,13 +224,13 @@ export default function NativeMinnisspil() {
         });
 
         // Clear web state flag!
-        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', 'minnisspil');
+        // Removed game_states deletion to preserve state for replay visualization
 
         if (xpReward > 0) {
             await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
             setEarnedXp(xpReward);
         }
-        setIsFreshGameOver(true);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
     };
 
     const handleCloseModal = () => {
@@ -235,7 +249,15 @@ export default function NativeMinnisspil() {
     };
 
     const handleShare = async () => {
-        // Placeholder share
+        const header = `Dulur: Minnisspil 🧠`;
+        const xpText = earnedXp ? `\n⭐ XP: +${earnedXp}` : '';
+        const mText = `Tilraunir: ${turns}`;
+        const message = `${header}\n${mText}${xpText}\n\nÉg leysti minnisspilið!\ndulur.is 🔥`;
+        try {
+            await Share.share({ message });
+        } catch (error) {
+            console.error('Error sharing', error);
+        }
     };
 
     const syncState = async (nextTurns: number, nextMistakes: number, nextMatched: string[], nextFlipped: number[]) => {
@@ -305,7 +327,10 @@ export default function NativeMinnisspil() {
     }
 
     return (
-        <MobileGameLayout onBack={() => router.back()} gameId="minnisspil" gameTitle="Minnisspil" isGameOver={gameState !== 'playing'}>
+        <>
+            <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+            <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
+                <MobileGameLayout onBack={() => router.back()} gameId="minnisspil" gameTitle="Minnisspil" isGameOver={gameState !== 'playing'}>
             
             {/* Header info */}
             <View className="w-full px-6 mb-6 self-center max-w-[500px]">
@@ -317,76 +342,40 @@ export default function NativeMinnisspil() {
                 </View>
             </View>
 
-            {gameState === 'won' && isFreshGameOver && (
-                <View className="absolute top-[15%] self-center bg-white px-6 py-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] items-center z-40 w-[85%] max-w-[340px] border border-gray-200">
-                    <TouchableOpacity 
-                        onPress={handleCloseModal}
-                        className="absolute top-4 right-4 p-2 z-50 bg-gray-100 rounded-full"
-                    >
-                        <Ionicons name="close" size={24} color="#64748B" />
-                    </TouchableOpacity>
-
-                    <Text className="text-3xl font-black font-serif text-[#1A1A1B] mb-2 mt-4 text-center">Leyst upp!</Text>
-                    <Text className="text-base font-medium text-gray-500 mb-6 text-center">Þú leystir spilið í {turns} tilraunum!</Text>
-
-                    {earnedXp !== null && earnedXp > 0 && (
-                        <View className="flex-row items-center justify-center bg-yellow-500/10 border-2 border-yellow-500 px-6 py-3 rounded-2xl mb-6">
-                            <Ionicons name="star" size={20} color="#EAB308" style={{ marginRight: 6 }} />
-                            <Text className="text-xl font-bold text-yellow-600">+{earnedXp} XP</Text>
-                        </View>
-                    )}
-
-                    <View className="w-full space-y-3">
-                        <TouchableOpacity 
-                            onPress={handleShare} 
-                            className="w-full flex-row items-center justify-center bg-[#4F46E5] rounded-xl py-4 shadow-sm mb-3"
-                        >
-                            <Ionicons name="share-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text className="text-white font-bold text-lg">Deila Niðurstöðu</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                            onPress={handleCloseModal}
-                            className="w-full flex-row items-center justify-center bg-gray-100 rounded-xl py-4"
-                        >
-                            <Text className="text-gray-600 font-bold text-lg">Áfram</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
+            <NativeGameEndModal
+                gameTitle="Minnisspil"
+                visible={gameState === 'won' && isFreshGameOver}
+                gameState="won"
+                xpEarned={earnedXp}
+                winTitle="Leik lokið!"
+                winDesc={`Þú leystir spilið í ${turns} tilraunum.`}
+                onContinue={handleCloseModal}
+                primaryButtonText="Deila niðurstöðu"
+                onPrimaryAction={handleShare}
+            />
 
             {showFlyXp && earnedXp !== null && earnedXp > 0 && (
                 <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
-                    <View className="bg-yellow-500 flex-row items-center px-6 py-3 rounded-full shadow-lg border-2 border-white">
-                        <Ionicons name="star" size={24} color="white" style={{ marginRight: 8 }} />
-                        <Text className="text-white font-black text-2xl">+{earnedXp} XP</Text>
+                    <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                        <Ionicons name="star" size={16} color="white" />
+                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                     </View>
                 </Animated.View>
             )}
 
-            {!isFreshGameOver && gameState === 'won' && (
-                <View className="flex-1 items-center justify-center w-full px-6 min-h-[300px]">
-                    <Text className="text-7xl mb-4">👏</Text>
-                    <Text className="text-[#1A1A1B] text-3xl font-black uppercase tracking-widest text-center">Vel Gert</Text>
-
-                    <View className="flex-row items-center mt-12 bg-white px-10 py-6 rounded-3xl shadow-sm border border-[#D3D6DA]">
-                        <Text className="text-[#1A1A1B] font-black text-3xl tracking-tighter">Tilraunir: {turns}</Text>
-                    </View>
-                </View>
-            )}
-
-            {gameState === 'playing' && (
-                <View className="flex-1 w-full flex-row flex-wrap justify-center px-6 pb-20 max-w-[500px] self-center">
-                    {game.cards.map((card, index) => (
-                        <CardComponent 
-                            key={index}
-                            card={card}
-                            isFlipped={flippedIndices.includes(index)}
-                            isMatched={matchedIcons.includes(card.iconId as string)}
-                            onPress={() => handleCardClick(index)}
-                        />
-                    ))}
-                </View>
-            )}
+            <View className="flex-1 w-full flex-row flex-wrap justify-center px-6 pb-20 max-w-[500px] self-center">
+                {game.cards.map((card, index) => (
+                    <CardComponent 
+                        key={index}
+                        card={card}
+                        isFlipped={gameState === 'won' ? true : flippedIndices.includes(index)}
+                        isMatched={gameState === 'won' ? true : matchedIcons.includes(card.iconId as string)}
+                        onPress={() => handleCardClick(index)}
+                    />
+                ))}
+            </View>
         </MobileGameLayout>
+        </SafeAreaView>
+        </>
     );
 }

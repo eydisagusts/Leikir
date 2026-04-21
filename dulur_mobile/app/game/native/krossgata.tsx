@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
@@ -85,17 +86,33 @@ export default function NativeKrossgata() {
     });
 
     const handleShare = async () => {
-        await Share.share({
-            message: `Ég var að klára Dulur Krossgátu dagsins! 🎉\n\nPrófaðu á https://dulur.is/krossgata`,
-        });
+        const header = `Dulur: Krossgáta 📝`;
+        const xpText = earnedXp ? `\n⭐ XP: +${earnedXp}` : '';
+        const message = `${header}\n${xpText}\n\nÉg leysti krossgátu dagsins!\ndulur.is 🔥`;
+        try {
+            await Share.share({ message });
+        } catch (error) {
+            console.error('Error sharing', error);
+        }
     };
 
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/krossgata/init`);
-                if (!res.ok) throw new Error('API down');
-                const data: CrosswordPuzzle = await res.json();
+                const today = new Date().toISOString().split('T')[0];
+
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/krossgata/init`).then(res => res.json());
+
+                const [{ data: { session } }, data] = await Promise.all([sessionPromise, apiPromise]);
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'krossgata').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `krossgata_${data.id}`).maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [resDataRes, stateDataRes] = await dbPromises;
                 
                 // Build Matrix
                 const matrix: (CellData | null)[][] = Array(data.rows).fill(null).map(() => Array(data.cols).fill(null));
@@ -131,7 +148,6 @@ export default function NativeKrossgata() {
 
                 setPuzzle(data);
                 
-                const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
                     setGrid(matrix);
                     setGameState('playing');
@@ -139,9 +155,9 @@ export default function NativeKrossgata() {
                     return; 
                 }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: resData } = await supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'krossgata').gte('played_at', `${today}T00:00:00Z`).single();
-                
+                const resData = resDataRes.data;
+                const stateData = stateDataRes.data;
+
                 if (resData) {
                     setGameState('won');
                     // Fill all answers
@@ -152,7 +168,6 @@ export default function NativeKrossgata() {
                     }
                     setGrid(matrix);
                 } else {
-                    const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `krossgata_${data.id}`).single();
                     let hasExistingGuesses = false;
                     if (stateData && stateData.state_json.userGrid) {
                         for(let r=0; r<data.rows; r++){
@@ -328,17 +343,7 @@ export default function NativeKrossgata() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         setEarnedXp(100);
-        setTimeout(() => {
-            setShowFlyXp(true);
-            xpAnimY.value = 0;
-            xpAnimOpacity.value = 1;
-            xpAnimY.value = withTiming(-350, { duration: 1200 });
-            xpAnimOpacity.value = withTiming(0, { duration: 1200 });
-            setTimeout(() => {
-                setShowFlyXp(false);
-                DeviceEventEmitter.emit('xp-earned', 100);
-            }, 1300);
-        }, 800);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -423,6 +428,19 @@ export default function NativeKrossgata() {
                 scrollEnabled={true}
                 onBack={() => router.back()}
             >
+
+                <NativeGameEndModal
+                gameTitle="Krossgátu"
+                    visible={gameState === 'won' && isFreshGameOver}
+                    gameState="won"
+                    xpEarned={earnedXp}
+                    winTitle="Vel gert!"
+                    winDesc="Krossgáta leyst."
+                    onContinue={handleCloseModal}
+                    primaryButtonText="Deila niðurstöðu"
+                    onPrimaryAction={handleShare}
+                />
+
                 {/* Clue Banner */}
                 {gameState === 'playing' ? (
                     <View className="bg-blue-50 w-full px-4 py-3 border-2 border-blue-200 rounded-xl mb-4 min-h-[60px] justify-center items-center shadow-sm">
@@ -592,9 +610,9 @@ export default function NativeKrossgata() {
 
                 {showFlyXp && earnedXp !== null && earnedXp > 0 && (
                     <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
-                        <View className="bg-yellow-500 flex-row items-center px-6 py-3 rounded-full shadow-lg border-2 border-white">
-                            <Ionicons name="star" size={24} color="white" style={{ marginRight: 8 }} />
-                            <Text className="text-white font-black text-2xl">+{earnedXp}</Text>
+                        <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                            <Ionicons name="star" size={16} color="white" />
+                            <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                         </View>
                     </Animated.View>
                 )}

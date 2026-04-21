@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
+import { View, Text, Pressable, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share, TextInput, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, withTiming, withSequence, withDelay, interpolate, useSharedValue } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 
@@ -59,7 +60,7 @@ function AnimatedCell({ char, state, index, isRevealing, wordLength }: { char: s
             borderColor = 'transparent';
             if (state === 'correct') bgColor = '#22C55E';
             if (state === 'present') bgColor = '#EAB308';
-            if (state === 'absent') { bgColor = '#F1F5F9'; borderColor = '#F1F5F9'; }
+            if (state === 'absent') { bgColor = '#E2E8F0'; borderColor = '#E2E8F0'; }
         }
 
         return {
@@ -72,7 +73,7 @@ function AnimatedCell({ char, state, index, isRevealing, wordLength }: { char: s
 
     return (
         <Animated.View style={[{ width: 44, height: 44, marginHorizontal: 3, marginBottom: 6, zIndex: isRevealing ? 50 : 1 }, animatedStyle]}>
-            <Animated.View style={[{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderRadius: 0, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: state === 'tbd' ? 0.03 : 0, shadowRadius: 2, elevation: state === 'tbd' ? 1 : 0 }, innerStyle]}>
+            <Animated.View style={[{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: state === 'tbd' ? 0.03 : 0, shadowRadius: 2, elevation: state === 'tbd' ? 1 : 0 }, innerStyle]}>
                 <Text style={{ 
                     fontSize: 24, 
                     fontWeight: '800', 
@@ -97,6 +98,8 @@ export default function NativeOrdla() {
     const [isRevealing, setIsRevealing] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
 
+    const inputRef = useRef<TextInput>(null);
+
     const [earnedXp, setEarnedXp] = useState<number | null>(null);
     const [showFlyXp, setShowFlyXp] = useState(false);
     const [isFreshGameOver, setIsFreshGameOver] = useState(false);
@@ -115,14 +118,23 @@ export default function NativeOrdla() {
     const initGame = async (length: number) => {
         setGameState('loading');
         try {
-            // Run API fetch and token grab in parallel
-            const [res, { data: { user } }] = await Promise.all([
-                fetch(`${API_URL}/api/mobile/ordla/init?length=${length}`),
-                supabase.auth.getUser()
-            ]);
+            const today = new Date().toISOString().split('T')[0];
+            
+            const sessionPromise = supabase.auth.getSession();
+            const apiPromise = fetch(`${API_URL}/api/mobile/ordla/init?length=${length}`).then(res => res.json());
 
-            if (!res.ok) throw new Error('API down');
-            const data = await res.json();
+            const { data: { session } } = await sessionPromise;
+            const user = session?.user;
+
+            const dbPromises = user ? Promise.all([
+                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `ordla_${length}`).maybeSingle(),
+                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `ordla_${length}`).gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+            ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+            const [data, [stateRes, resultRes]] = await Promise.all([
+                apiPromise,
+                dbPromises
+            ]);
             
             setTargetWord(data.targetWord);
             setDictionary(new Set(data.dict));
@@ -130,13 +142,6 @@ export default function NativeOrdla() {
             setCurrentGuess('');
             
             if (!user) { setGameState('playing'); return; }
-
-            // Check db status in parallel
-            const today = new Date().toISOString().split('T')[0];
-            const [stateRes, resultRes] = await Promise.all([
-                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `ordla_${length}`).maybeSingle(),
-                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `ordla_${length}`).gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
-            ]);
 
             const existingState = stateRes.data;
             const existingResult = resultRes.data;
@@ -211,6 +216,22 @@ export default function NativeOrdla() {
         }
     };
 
+    const handleTextChange = (text: string) => {
+        if (gameState !== 'playing' || isRevealing) return;
+        DeviceEventEmitter.emit('start-timer');
+        const filtered = text.toUpperCase().replace(/[^A-ZÁÉÍÓÚÝÐÞÆÖ]/g, '');
+        const truncated = filtered.slice(0, wordLength);
+        if (truncated !== currentGuess) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setCurrentGuess(truncated);
+        }
+    };
+
+    const handleSubmit = () => {
+        if (gameState !== 'playing' || isRevealing) return;
+        onKeyPress('ENTER');
+    };
+
     const validateGuess = async () => {
         setIsRevealing(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -263,7 +284,7 @@ export default function NativeOrdla() {
 
             if (isWin || isLoss) {
                 setGameState(isWin ? 'won' : 'lost');
-                setIsFreshGameOver(true);
+                setTimeout(() => setIsFreshGameOver(true), 1000);
                 newGuesses[newGuesses.length - 1].states = finalStates;
                 await syncTrueResult(isWin, newGuesses);
             } else {
@@ -312,9 +333,13 @@ export default function NativeOrdla() {
         guesses.forEach(g => {
             g.word.split('').forEach((char, i) => {
                 const state = g.states[i];
-                if (state === 'correct') states[char] = 'correct';
-                if (state === 'present' && states[char] !== 'correct') states[char] = 'present';
-                if (state === 'absent' && states[char] === 'empty' && !states[char]) states[char] = 'absent';
+                if (state === 'correct') {
+                    states[char] = 'correct';
+                } else if (state === 'present') {
+                    if (states[char] !== 'correct') states[char] = 'present';
+                } else if (state === 'absent') {
+                    if (!states[char]) states[char] = 'absent';
+                }
             });
         });
         return states;
@@ -401,90 +426,73 @@ export default function NativeOrdla() {
                             </View>
                         </View>
                     ) : (
-                        <View className="flex-1 flex-col items-center w-full self-center pb-2 pt-2">
-                        {/* Length Selector */}
-                        <View className="flex-row items-center justify-center gap-2 bg-[#F0F0F0] rounded-full p-1.5 border border-[#D3D6DA] self-center mb-6">
-                            {[5,6,7].map(len => (
-                                <Pressable 
-                                    key={len} 
-                                    onPress={() => handleWordLengthChange(len)} 
-                                    className={`px-5 py-2.5 rounded-full ${wordLength === len ? 'bg-white shadow-sm border border-gray-100' : ''}`}
-                                >
-                                    <Text className={`font-bold text-sm ${wordLength === len ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>{len} stafir</Text>
-                                </Pressable>
-                            ))}
-                        </View>
-
-                        {toast && (
-                            <View className="self-center z-50 bg-[#1A1A1B] px-4 py-3 rounded-xl shadow-lg mb-4">
-                                <Text className="text-white font-bold">{toast}</Text>
-                            </View>
-                        )}
-
-                        <View className="w-full flex-1 justify-center items-center self-center mb-6">
-                            {rows.map((row, rIdx) => (
-                                <View key={rIdx} className="flex-row w-full justify-center">
-                                    {row.word.split('').map((char, cIdx) => (
-                                        <AnimatedCell 
-                                            key={cIdx} 
-                                            char={char === ' ' ? '' : char} 
-                                            state={row.states[cIdx]} 
-                                            index={cIdx} 
-                                            isRevealing={row.isRevealing} 
-                                            wordLength={wordLength}
-                                        />
+                        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()} accessible={false}>
+                            <View className="flex-1 flex-col items-center w-full self-center pb-2 pt-2">
+                                <View className="flex-row items-center justify-center gap-2 bg-[#F0F0F0] rounded-full p-1.5 border border-[#D3D6DA] self-center mb-6 z-10">
+                                    {[5,6,7].map(len => (
+                                        <Pressable 
+                                            key={len} 
+                                            onPress={() => handleWordLengthChange(len)} 
+                                            className={`px-5 py-2.5 rounded-full ${wordLength === len ? 'bg-white shadow-sm border border-gray-100' : ''}`}
+                                        >
+                                            <Text className={`font-bold text-sm ${wordLength === len ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>{len} stafir</Text>
+                                        </Pressable>
                                     ))}
                                 </View>
-                            ))}
-                        </View>
 
-                        {(gameState === 'won' || gameState === 'lost') && !isRevealing && isFreshGameOver && (
-                            <View className="absolute top-1/4 self-center bg-white px-6 py-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] items-center z-40 w-[85%] max-w-[340px] border border-gray-200">
-                                <TouchableOpacity 
-                                    onPress={handleCloseModal}
-                                    className="absolute top-4 right-4 p-2 z-50 bg-gray-100 rounded-full"
-                                >
-                                    <Ionicons name="close" size={24} color="#64748B" />
-                                </TouchableOpacity>
-
-                                <View className={`w-20 h-20 rounded-full items-center justify-center mb-4 ${gameState === 'won' ? 'bg-green-100 border-4 border-green-200' : 'bg-red-100 border-4 border-red-200'}`}>
-                                    <Text className="text-4xl">{gameState === 'won' ? '🏆' : '💥'}</Text>
-                                </View>
-
-                                <Text className="text-3xl font-black font-serif text-[#1A1A1B] mb-2">{gameState === 'won' ? 'Vel gert!' : 'Því miður!'}</Text>
-                                <Text className="text-lg font-medium text-gray-500 mb-6 text-center">Orðið var: <Text className="font-bold text-[#1A1A1B]">{targetWord}</Text></Text>
-
-                                {earnedXp !== null && earnedXp > 0 && (
-                                    <View className="flex-row items-center justify-center bg-yellow-500/10 border-2 border-yellow-500 px-6 py-3 rounded-2xl mb-6">
-                                        <Ionicons name="star" size={20} color="#EAB308" style={{ marginRight: 6 }} />
-                                        <Text className="text-xl font-bold text-yellow-600">+{earnedXp} XP</Text>
+                                {toast && (
+                                    <View style={{ position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999, elevation: 10, alignItems: 'center' }} pointerEvents="none">
+                                        <View className="bg-[#1A1A1B] px-4 py-3 rounded-xl shadow-lg">
+                                            <Text className="text-white font-bold">{toast}</Text>
+                                        </View>
                                     </View>
                                 )}
 
-                                <View className="w-full space-y-3">
-                                    <TouchableOpacity 
-                                        onPress={handleShare} 
-                                        className="w-full flex-row items-center justify-center bg-[#4F46E5] rounded-xl py-4 shadow-sm mb-3"
-                                    >
-                                        <Ionicons name="share-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                                        <Text className="text-white font-bold text-lg">Deila Niðurstöðu</Text>
-                                    </TouchableOpacity>
-                                    
-                                    <TouchableOpacity 
-                                        onPress={handleCloseModal}
-                                        className="w-full flex-row items-center justify-center bg-gray-100 rounded-xl py-4"
-                                    >
-                                        <Text className="text-gray-600 font-bold text-lg">Áfram</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        )}
+                                <Pressable onPress={() => inputRef.current?.focus()} className="w-full flex-1 justify-center items-center self-center mb-6 relative">
+                                    <TextInput
+                                        ref={inputRef}
+                                        value={currentGuess}
+                                        onChangeText={handleTextChange}
+                                        onSubmitEditing={handleSubmit}
+                                        autoCorrect={false}
+                                        autoCapitalize="characters"
+                                        maxLength={wordLength}
+                                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                                        spellCheck={false}
+                                    />
+                                    {rows.map((row, rIdx) => (
+                                        <View key={rIdx} className="flex-row w-full justify-center" pointerEvents="none">
+                                            {row.word.split('').map((char, cIdx) => (
+                                                <AnimatedCell 
+                                                    key={cIdx} 
+                                                    char={char === ' ' ? '' : char} 
+                                                    state={row.states[cIdx]} 
+                                                    index={cIdx} 
+                                                    isRevealing={row.isRevealing} 
+                                                    wordLength={wordLength}
+                                                />
+                                            ))}
+                                        </View>
+                                    ))}
+                                </Pressable>
+
+                        <NativeGameEndModal
+                gameTitle="Orðlu"
+                            visible={(gameState === 'won' || gameState === 'lost') && !isRevealing && isFreshGameOver}
+                            gameState={gameState as 'won' | 'lost'}
+                            xpEarned={earnedXp}
+                            winTitle="Vel gert!"
+                            winDesc={`Orðið var: ${targetWord}`}
+                            loseTitle="Því miður!"
+                            loseDesc={`Orðið var: ${targetWord}`}
+                            onContinue={handleCloseModal}
+                        />
 
                         {showFlyXp && earnedXp !== null && earnedXp > 0 && (
                             <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
-                                <View className="bg-yellow-500 flex-row items-center px-6 py-3 rounded-full shadow-lg border-2 border-white">
-                                    <Ionicons name="star" size={24} color="white" style={{ marginRight: 8 }} />
-                                    <Text className="text-white font-black text-2xl">+{earnedXp} XP</Text>
+                                <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                                    <Ionicons name="star" size={16} color="white" />
+                                    <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                                 </View>
                             </Animated.View>
                         )}
@@ -500,7 +508,7 @@ export default function NativeOrdla() {
                                         let textCol = '#1A1A1B';
                                         if (state === 'correct') { bgColor = '#22C55E'; textCol = 'white'; }
                                         if (state === 'present') { bgColor = '#EAB308'; textCol = 'white'; }
-                                        if (state === 'absent') { bgColor = '#CBD5E1'; textCol = 'white'; }
+                                        if (state === 'absent') { bgColor = '#94A3B8'; textCol = 'white'; }
 
                                         return (
                                             <TouchableOpacity 
@@ -530,7 +538,8 @@ export default function NativeOrdla() {
                                 </View>
                             ))}
                         </View>
-                        </View>
+                            </View>
+                        </TouchableWithoutFeedback>
                     )}
                 </MobileGameLayout>
             </SafeAreaView>

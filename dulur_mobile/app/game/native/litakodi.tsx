@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { Stack, router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DeviceEventEmitter } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { DeviceEventEmitter, Share } from 'react-native';
+import { Animated } from 'react-native';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import { supabase } from '@/lib/supabase';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
@@ -58,50 +60,60 @@ export default function NativeLitakodi() {
     const [isFreshGameOver, setIsFreshGameOver] = useState(false);
     
     // XP Animation vars
-    const xpAnimY = useSharedValue(0);
-    const xpAnimOpacity = useSharedValue(1);
+    const xpAnimY = React.useRef(new Animated.Value(0)).current;
+    const xpAnimOpacity = React.useRef(new Animated.Value(1)).current;
 
-    const flyStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ translateY: xpAnimY.value }],
-            opacity: xpAnimOpacity.value,
-        };
-    });
+    const flyStyle = {
+        transform: [{ translateY: xpAnimY }],
+        opacity: xpAnimOpacity,
+    };
 
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/litakodi/init`);
-                if (!res.ok) throw new Error('API down');
-                const data = await res.json();
+                const today = new Date().toISOString().split('T')[0];
+
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/litakodi/init`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_results')
+                        .select('won')
+                        .eq('user_id', user.id)
+                        .eq('game_type', 'litakodi')
+                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'litakodi').maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [data, [resDataRes, stateDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
+
                 setSecretCode(data.code);
                 
-                const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
                     setGameState('playing');
                     return;
                 }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: resData } = await supabase.from('game_results')
-                    .select('won')
-                    .eq('user_id', user.id)
-                    .eq('game_type', 'litakodi')
-                    .gte('played_at', `${today}T00:00:00Z`).single();
-                
+                const resData = resDataRes.data;
+                const stateData = stateDataRes.data;
+
+                if (stateData && stateData.state_json && stateData.updated_at.startsWith(today)) {
+                    setRows(stateData.state_json.rows || rows);
+                    setCurrentRowIndex(stateData.state_json.currentRowIndex || 0);
+                } else if (stateData) {
+                    // Removed game_states deletion to preserve state for replay visualization
+                }
+
                 if (resData) {
                     setGameState(resData.won ? 'won' : 'lost');
-                    // We don't have the historic board gracefully loaded here since they finished it prior,
-                    // but we will just show the end screen.
-                    setCurrentRowIndex(MAX_GUESSES); 
+                    // We DO have the historic board gracefully loaded here now.
                 } else {
-                    const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'litakodi').single();
-                    if (stateData && stateData.state_json && stateData.updated_at.startsWith(today)) {
-                        setRows(stateData.state_json.rows || rows);
-                        setCurrentRowIndex(stateData.state_json.currentRowIndex || 0);
-                    } else if (stateData) {
-                        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', 'litakodi');
-                    }
                     // Timer will start on first interaction
                     setGameState('playing');
                 }
@@ -120,44 +132,64 @@ export default function NativeLitakodi() {
         if (!user) return;
 
         let elapsed = 0;
-        const date = new Date().toLocaleDateString('en-CA');
+        const date = new Date().toISOString().split('T')[0];
         const key = `timer_${user.id}_litakodi_${date}`;
         const savedTime = await AsyncStorage.getItem(key);
-        if (savedTime) elapsed = parseInt(savedTime, 10);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 0;
 
         const xpReward = statusArg === 'won' ? (100 + ((MAX_GUESSES - (targetRow + 1)) * 20)) : 0;
 
-        await supabase.from('game_results').insert({
+        const { error } = await supabase.from('game_results').insert({
             time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: 'litakodi',
             score: xpReward,
             won: statusArg === 'won',
-            state_json: finalRows as any
+            metadata: { rows: finalRows } as any // Use metadata column for historic data matching Web schema
         });
 
+        if (error) {
+            console.error("Litakodi result insert failed:", error);
+            setTimeout(() => setIsFreshGameOver(true), 1000);
+            return;
+        }
+
         // Clear state sync tag
-        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', 'litakodi');
+        // Removed game_states deletion to preserve state for replay visualization
 
         if (xpReward > 0) {
             await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
             setEarnedXp(xpReward);
         }
-        setIsFreshGameOver(true);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
     };
 
     const handleCloseModal = () => {
         setIsFreshGameOver(false);
         if (earnedXp && earnedXp > 0) {
             setShowFlyXp(true);
-            xpAnimY.value = 0;
-            xpAnimOpacity.value = 1;
-            xpAnimY.value = withTiming(-350, { duration: 1200 });
-            xpAnimOpacity.value = withTiming(0, { duration: 1200 });
+            xpAnimY.setValue(0);
+            xpAnimOpacity.setValue(1);
+            Animated.parallel([
+                Animated.timing(xpAnimY, { toValue: -350, duration: 1200, useNativeDriver: true }),
+                Animated.timing(xpAnimOpacity, { toValue: 0, duration: 1200, useNativeDriver: true })
+            ]).start();
             setTimeout(() => {
                 setShowFlyXp(false);
                 DeviceEventEmitter.emit('xp-earned', earnedXp);
             }, 1300);
+        }
+    };
+
+    const handleShare = async () => {
+        const header = `Dulur: Litakóði 🎨`;
+        const xpText = earnedXp ? `\n⭐ XP: +${earnedXp}` : '';
+        const mText = `Tilraunir: ${currentRowIndex + 1}/6`;
+        const message = `${header}\n${mText}${xpText}\n\nÉg braut kóðann!\ndulur.is 🔥`;
+        try {
+            await Share.share({ message });
+        } catch (error) {
+            console.error('Error sharing', error);
         }
     };
 
@@ -278,9 +310,11 @@ export default function NativeLitakodi() {
 
         if (ex === CODE_LENGTH) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            syncState(newRows, currentRowIndex);
             completeGame('won', newRows, currentRowIndex);
         } else if (currentRowIndex === MAX_GUESSES - 1) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            syncState(newRows, currentRowIndex);
             completeGame('lost', newRows, currentRowIndex);
         } else {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -299,76 +333,68 @@ export default function NativeLitakodi() {
     }
 
     return (
-        <MobileGameLayout onBack={() => router.back()} gameId="litakodi" gameTitle="Litakóði" isGameOver={gameState !== 'playing'}>
+        <>
+            <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+            <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={["top", "bottom"]}>
+                <MobileGameLayout onBack={() => router.back()} gameId="litakodi" gameTitle="Litakóði" isGameOver={gameState !== 'playing'}>
             
-            {gameState !== 'playing' && isFreshGameOver && (
-                <View className="absolute top-[15%] self-center bg-white px-6 py-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] items-center z-40 w-[85%] max-w-[340px] border border-gray-200">
-                    <TouchableOpacity 
-                        onPress={handleCloseModal}
-                        className="absolute top-4 right-4 p-2 z-50 bg-gray-100 rounded-full"
-                    >
-                        <Ionicons name="close" size={24} color="#64748B" />
-                    </TouchableOpacity>
-
-                    <Text className="text-3xl font-black font-serif text-[#1A1A1B] mb-2 mt-4 text-center">
-                        {gameState === 'won' ? 'Brotinn!' : 'Misstókst'}
-                    </Text>
-                    <Text className="text-base font-medium text-gray-500 mb-6 text-center">
-                        {gameState === 'won' ? `Kóðinn var brotinn í ${currentRowIndex + 1} tilraunum` : 'Þér mistókst að brjóta kóðann í þetta skiptið.'}
-                    </Text>
-
-                    {gameState === 'won' && earnedXp !== null && earnedXp > 0 && (
-                        <View className="flex-row items-center justify-center bg-yellow-500/10 border-2 border-yellow-500 px-6 py-3 rounded-2xl mb-6">
-                            <Ionicons name="star" size={20} color="#EAB308" style={{ marginRight: 6 }} />
-                            <Text className="text-xl font-bold text-yellow-600">+{earnedXp} XP</Text>
-                        </View>
-                    )}
-
-                    <View className="w-full space-y-3">
-                        <TouchableOpacity className="w-full flex-row items-center justify-center bg-[#4F46E5] rounded-xl py-4 shadow-sm mb-3">
-                            <Ionicons name="share-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text className="text-white font-bold text-lg">Deila Niðurstöðu</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleCloseModal} className="w-full flex-row items-center justify-center bg-gray-100 rounded-xl py-4">
-                            <Text className="text-gray-600 font-bold text-lg">Áfram</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
+            <NativeGameEndModal
+                gameTitle="Litakóða"
+                visible={gameState !== 'playing' && isFreshGameOver}
+                gameState={gameState}
+                xpEarned={earnedXp}
+                winTitle={gameState === 'won' ? 'Vel gert!' : 'Leik lokið'}
+                winDesc={gameState === 'won' ? `Kóðinn var brotinn í ${currentRowIndex + 1} tilraunum!` : 'Þér mistókst að brjóta kóðann.'}
+                onContinue={handleCloseModal}
+                primaryButtonText="Deila niðurstöðu"
+                onPrimaryAction={handleShare}
+            />
 
             {showFlyXp && earnedXp !== null && earnedXp > 0 && (
                 <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
-                    <View className="bg-yellow-500 flex-row items-center px-6 py-3 rounded-full shadow-lg border-2 border-white">
-                        <Ionicons name="star" size={24} color="white" style={{ marginRight: 8 }} />
-                        <Text className="text-white font-black text-2xl">+{earnedXp} XP</Text>
+                    <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                        <Ionicons name="star" size={16} color="white" />
+                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                     </View>
                 </Animated.View>
             )}
 
-            {!isFreshGameOver && gameState !== 'playing' && (
-                <View className="flex-1 items-center justify-center w-full px-6 min-h-[300px]">
-                    <Text className="text-7xl mb-4">{gameState === 'won' ? '👏' : '😬'}</Text>
-                    <Text className="text-[#1A1A1B] text-3xl font-black uppercase tracking-widest text-center">{gameState === 'won' ? 'Vel Gert' : 'Gengur betur næst'}</Text>
-                    
-                    {/* Expose Answer */}
-                    <View className="flex-row items-center justify-center gap-3 mt-8 bg-white px-8 py-5 rounded-3xl shadow-sm border border-[#D3D6DA]">
-                        {secretCode.map((c, i) => (
-                            <View key={i} style={{ backgroundColor: ColorMap[c], width: 36, height: 36, borderRadius: 18 }} />
-                        ))}
-                    </View>
-                </View>
-            )}
 
-            {gameState === 'playing' && (
-                <View className="flex-1 w-full flex-col px-4 pb-12 max-w-[500px] self-center items-center">
-                    
-                    {/* Board */}
+
+            <View className="flex-1 w-full flex-col px-4 pb-12 max-w-[500px] self-center items-center">
+                
+                {/* Board */}
                     <View className="w-full flex-col gap-3 p-4 bg-white rounded-3xl border border-gray-200 shadow-sm mt-4">
+                        
+                        {gameState !== 'playing' && secretCode && isFreshGameOver === false && (
+                            <View className="w-full flex-row items-center p-4 mb-2 rounded-2xl bg-slate-100 border border-slate-200 shadow-sm justify-between">
+                                <Text className="text-slate-800 font-black uppercase text-xs tracking-[2px]">Lausn:</Text>
+                                <View className="flex-row items-center flex-1 justify-end gap-2 pr-14">
+                                    {secretCode.map((c, idx) => (
+                                        <View 
+                                            key={`secret-${idx}`} 
+                                            className="w-10 h-10 rounded-full shadow-sm border-2 border-white"
+                                            style={{
+                                                backgroundColor: ColorMap[c],
+                                                shadowColor: '#000',
+                                                shadowOpacity: 0.1,
+                                                shadowRadius: 3,
+                                                shadowOffset: { width: 0, height: 2 },
+                                                elevation: 2
+                                            }}
+                                        />
+                                    ))}
+                                </View>
+                            </View>
+                        )}
                         {rows.map((row, r) => {
-                            const isActive = r === currentRowIndex;
+                            const isActive = r === currentRowIndex && gameState === 'playing';
 
                             return (
-                                <View key={r} className={`flex-row items-center p-2 rounded-2xl ${isActive ? 'bg-indigo-50 border border-indigo-200 shadow-inner' : 'bg-transparent'}`}>
+                                <View 
+                                    key={r} 
+                                    className={`flex-row items-center p-2 rounded-2xl ${isActive ? 'bg-indigo-50 border border-indigo-200' : 'bg-transparent'}`}
+                                >
                                     
                                     {/* Guesses */}
                                     <View className="flex-row items-center gap-2 flex-1">
@@ -418,36 +444,39 @@ export default function NativeLitakodi() {
                     </View>
 
                     {/* Palletes and interactions below */}
-                    <View className="w-full mt-6 mb-6">
-                        <View className="flex-row flex-wrap justify-center gap-3 p-4 bg-white border border-gray-200 rounded-3xl shadow-sm mb-4">
-                            {ALL_COLORS.slice(0, 6).map(color => (
-                                <TouchableOpacity
-                                    key={color}
-                                    onPress={() => handleColorPaletteSelect(color)}
-                                    className="w-12 h-12 rounded-full border-2 border-black/10 shadow-sm"
-                                    style={{ backgroundColor: ColorMap[color] }}
-                                />
-                            ))}
+                    {gameState === 'playing' && (
+                        <View className="w-full mt-6 mb-6">
+                            <View className="flex-row flex-wrap justify-center gap-3 p-4 bg-white border border-gray-200 rounded-3xl shadow-sm mb-4">
+                                {ALL_COLORS.slice(0, 6).map(color => (
+                                    <TouchableOpacity
+                                        key={color}
+                                        onPress={() => handleColorPaletteSelect(color)}
+                                        className="w-12 h-12 rounded-full border-2 border-black/10 shadow-sm"
+                                        style={{ backgroundColor: ColorMap[color] }}
+                                    />
+                                ))}
+                            </View>
+                            <View className="flex-row justify-between gap-3 px-2">
+                                <TouchableOpacity 
+                                    onPress={handleDelete}
+                                    className="flex-1 items-center justify-center py-4 bg-white border border-gray-200 rounded-2xl shadow-sm"
+                                >
+                                    <Ionicons name="backspace-outline" size={24} color="#64748b" />
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    disabled={rows[currentRowIndex].guess.includes(null)}
+                                    onPress={handleSubmit}
+                                    className={`flex-[2] items-center justify-center py-4 rounded-2xl shadow-sm ${rows[currentRowIndex].guess.includes(null) ? 'bg-gray-300' : 'bg-[#1A1A1B]'}`}
+                                >
+                                    <Text className="text-white font-bold text-lg font-serif">Giska</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                        <View className="flex-row justify-between gap-3 px-2">
-                             <TouchableOpacity 
-                                onPress={handleDelete}
-                                className="flex-1 items-center justify-center py-4 bg-white border border-gray-200 rounded-2xl shadow-sm"
-                            >
-                                <Ionicons name="backspace-outline" size={24} color="#64748b" />
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                disabled={rows[currentRowIndex].guess.includes(null)}
-                                onPress={handleSubmit}
-                                className={`flex-[2] items-center justify-center py-4 rounded-2xl shadow-sm ${rows[currentRowIndex].guess.includes(null) ? 'bg-gray-300' : 'bg-[#1A1A1B]'}`}
-                            >
-                                <Text className="text-white font-bold text-lg font-serif">Giska</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                    )}
 
                 </View>
-            )}
         </MobileGameLayout>
+            </SafeAreaView>
+        </>
     );
 }

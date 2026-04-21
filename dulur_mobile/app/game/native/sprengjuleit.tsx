@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 const { width } = Dimensions.get('window');
@@ -97,10 +98,29 @@ export default function NativeSprengjuleit() {
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/sprengjuleit/init`);
-                if (!res.ok) throw new Error('API down');
-                const data: SprengjuleitGameData = await res.json();
-                setGame(data);
+                const today = new Date().toISOString().split('T')[0];
+
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/sprengjuleit/init`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_results')
+                        .select('won')
+                        .eq('user_id', user.id)
+                        .eq('game_type', 'sprengjuleit')
+                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
+                    supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', `sprengjuleit_${today}`).maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [data, [resDataRes, stateDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
+
+                setGame(data as SprengjuleitGameData);
                 
                 // Initialize Blank Grid
                 const initialGrid: CellState[][] = Array(data.rows).fill(null).map(() => 
@@ -112,26 +132,20 @@ export default function NativeSprengjuleit() {
                     }))
                 );
                 
-                const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
                     setGrid(initialGrid);
                     setGameState('playing');
                     return;
                 }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: resData } = await supabase.from('game_results')
-                    .select('won')
-                    .eq('user_id', user.id)
-                    .eq('game_type', 'sprengjuleit')
-                    .gte('played_at', `${today}T00:00:00Z`).single();
-                
+                const resData = resDataRes.data;
+                const stateData = stateDataRes.data;
+
                 if (resData) {
                     setGameState(resData.won ? 'won' : 'lost');
                     // Fully map winning/losing grid for show (omitted for brevity, just giving blank grid)
                     setGrid(initialGrid);
                 } else {
-                    const { data: stateData } = await supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', `sprengjuleit_${today}`).single();
                     if (stateData && stateData.state_json.clientGrid) {
                         setGrid(stateData.state_json.clientGrid);
                         setFirstClick(false);
@@ -300,7 +314,7 @@ export default function NativeSprengjuleit() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             let elapsed = 0;
-            const date = new Date().toLocaleDateString('en-CA');
+            const date = new Date().toISOString().split('T')[0];
             const key = `timer_${user.id}_sprengjuleit_${date}`;
             const savedTime = await AsyncStorage.getItem(key);
             if (savedTime) elapsed = parseInt(savedTime, 10);
@@ -315,7 +329,7 @@ export default function NativeSprengjuleit() {
                 won: false
             });
         }
-        setIsFreshGameOver(true);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
     };
 
     const checkWin = async (currentGrid: CellState[][]) => {
@@ -340,7 +354,7 @@ export default function NativeSprengjuleit() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 let elapsed = 0;
-                const date = new Date().toLocaleDateString('en-CA');
+                const date = new Date().toISOString().split('T')[0];
                 const key = `timer_${user.id}_sprengjuleit_${date}`;
                 const savedTime = await AsyncStorage.getItem(key);
                 if (savedTime) elapsed = parseInt(savedTime, 10);
@@ -363,7 +377,7 @@ export default function NativeSprengjuleit() {
 
                 setEarnedXp(finalXp);
             }
-            setIsFreshGameOver(true);
+            setTimeout(() => setIsFreshGameOver(true), 1000);
         }
     };
 
@@ -399,54 +413,23 @@ export default function NativeSprengjuleit() {
             <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
                 <MobileGameLayout onBack={() => router.back()} gameId="sprengjuleit" gameTitle="Sprengjuleit" isGameOver={gameState !== 'playing'}>
                     
-                    {(gameState === 'won' || gameState === 'lost') && isFreshGameOver && (
-                        <View className="absolute top-1/4 self-center bg-white px-6 py-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] items-center z-40 w-[85%] max-w-[340px] border border-gray-200">
-                            <TouchableOpacity 
-                                onPress={handleCloseModal}
-                                className="absolute top-4 right-4 p-2 z-50 bg-gray-100 rounded-full"
-                            >
-                                <Ionicons name="close" size={24} color="#64748B" />
-                            </TouchableOpacity>
-
-                            <View className={`w-20 h-20 rounded-full items-center justify-center mb-4 ${gameState === 'won' ? 'bg-green-100 border-4 border-green-200' : 'bg-red-100 border-4 border-red-200'}`}>
-                                <Text className="text-4xl">{gameState === 'won' ? '🏆' : '💥'}</Text>
-                            </View>
-
-                            <Text className="text-3xl font-black font-serif text-[#1A1A1B] mb-2">{gameState === 'won' ? 'Vel gert!' : 'Því miður!'}</Text>
-                            <Text className="text-base font-medium text-gray-500 mb-6 text-center">{gameState === 'won' ? "Þú fannst allar sprengjurnar!" : "Þú steigst á sprengju!"}</Text>
-
-                            {earnedXp !== null && earnedXp > 0 && (
-                                <View className="flex-row items-center justify-center bg-yellow-500/10 border-2 border-yellow-500 px-6 py-3 rounded-2xl mb-6">
-                                    <Ionicons name="star" size={20} color="#EAB308" style={{ marginRight: 6 }} />
-                                    <Text className="text-xl font-bold text-yellow-600">+{earnedXp} XP</Text>
-                                </View>
-                            )}
-
-                            <View className="w-full space-y-3">
-                                {gameState === 'won' && (
-                                    <TouchableOpacity 
-                                        onPress={handleShare} 
-                                        className="w-full flex-row items-center justify-center bg-[#4F46E5] rounded-xl py-4 shadow-sm mb-3"
-                                    >
-                                        <Ionicons name="share-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                                        <Text className="text-white font-bold text-lg">Deila Niðurstöðu</Text>
-                                    </TouchableOpacity>
-                                )}
-                                <TouchableOpacity 
-                                    onPress={handleCloseModal}
-                                    className="w-full flex-row items-center justify-center bg-gray-100 rounded-xl py-4"
-                                >
-                                    <Text className="text-gray-600 font-bold text-lg">Áfram</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
+                    <NativeGameEndModal
+                gameTitle="Sprengjuleit"
+                        visible={(gameState === 'won' || gameState === 'lost') && isFreshGameOver}
+                        gameState={gameState}
+                        xpEarned={earnedXp}
+                        winTitle={gameState === 'won' ? 'Vel gert!' : 'Því miður!'}
+                        winDesc={gameState === 'won' ? "Þú fannst allar sprengjurnar!" : "Þú steigst á sprengju!"}
+                        onContinue={handleCloseModal}
+                        primaryButtonText={gameState === 'won' ? "Deila niðurstöðu" : undefined}
+                        onPrimaryAction={gameState === 'won' ? handleShare : undefined}
+                    />
 
                     {showFlyXp && earnedXp !== null && earnedXp > 0 && (
                         <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
-                            <View className="bg-yellow-500 flex-row items-center px-6 py-3 rounded-full shadow-lg border-2 border-white">
-                                <Ionicons name="star" size={24} color="white" style={{ marginRight: 8 }} />
-                                <Text className="text-white font-black text-2xl">+{earnedXp} XP</Text>
+                            <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                                <Ionicons name="star" size={16} color="white" />
+                                <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                             </View>
                         </Animated.View>
                     )}

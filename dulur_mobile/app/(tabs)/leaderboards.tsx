@@ -13,9 +13,9 @@ type LeaderboardPlayer = {
 export default function LeaderboardsScreen() {
     const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
     const [friends, setFriends] = useState<LeaderboardPlayer[]>([]);
-    const [viewMode, setViewMode] = useState<'global'|'friends'>('global');
+    const [viewMode, setViewMode] = useState<'global' | 'friends'>('global');
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-    const [currentUserStats, setCurrentUserStats] = useState<{xp: number, rank: number, username: string} | null>(null);
+    const [currentUserStats, setCurrentUserStats] = useState<{ xp: number, rank: number, username: string } | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +33,7 @@ export default function LeaderboardsScreen() {
                     .select('id, username, xp')
                     .order('xp', { ascending: false })
                     .limit(50);
-                
+
                 if (globalErr) throw globalErr;
                 setPlayers(globalData || []);
 
@@ -53,7 +53,7 @@ export default function LeaderboardsScreen() {
                             .select('user_id1, user_id2')
                             .eq('status', 'accepted')
                             .or(`user_id1.eq.${userId},user_id2.eq.${userId}`);
-                        
+
                         let fIds = friendRows ? friendRows.map((r: any) => r.user_id1 === userId ? r.user_id2 : r.user_id1) : [];
                         fIds.push(userId);
 
@@ -62,7 +62,7 @@ export default function LeaderboardsScreen() {
                             .select('id, username, xp')
                             .in('id', fIds)
                             .order('xp', { ascending: false });
-                        
+
                         setFriends(fData || []);
                     }
                 }
@@ -83,7 +83,7 @@ export default function LeaderboardsScreen() {
         const rankToDisplay = forceRank !== undefined ? forceRank : (idx + 1);
         const nameToDisplay = player.username?.split('_')[0] || 'Nafnlaus';
         const isTop3 = rankToDisplay <= 3;
-        
+
         let bgClass = isSelf ? 'bg-indigo-50/80' : 'bg-white';
         let borderClass = isSelf ? 'border-indigo-200' : 'border-black/5';
         let crownColor = '#64748b';
@@ -94,13 +94,13 @@ export default function LeaderboardsScreen() {
         if (rankToDisplay === 3) { bgClass = 'bg-[#FAF0E6]'; borderClass = 'border-[#E6C6AE]'; crownColor = '#CD7F32'; shadowColor = '#CD7F32'; }
 
         return (
-            <View 
+            <View
                 key={player.id}
                 className={`w-full rounded-[24px] p-5 flex-row items-center border ${bgClass} ${borderClass} mb-3.5 relative overflow-hidden`}
-                style={isTop3 ? { 
-                    elevation: 4, shadowColor, shadowOpacity: 0.15, shadowOffset: { width: 0, height: 6 }, shadowRadius: 10 
-                } : { 
-                    elevation: 2, shadowColor: '#000', shadowOpacity: 0.04, shadowOffset: { width: 0, height: 4 }, shadowRadius: 6 
+                style={isTop3 ? {
+                    elevation: 4, shadowColor, shadowOpacity: 0.15, shadowOffset: { width: 0, height: 6 }, shadowRadius: 10
+                } : {
+                    elevation: 2, shadowColor: '#000', shadowOpacity: 0.04, shadowOffset: { width: 0, height: 4 }, shadowRadius: 6
                 }}
             >
                 {isTop3 && (
@@ -141,29 +141,44 @@ export default function LeaderboardsScreen() {
     return (
         <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top']}>
             <View className="px-6 pt-12 pb-6 items-center justify-center">
-                <Text className="text-[52px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center">Stigatafla.</Text>
-                <Text className="text-[18px] font-medium font-serif italic text-slate-500 mt-2 tracking-wide text-center">
-                    {viewMode === 'global' ? 'Topp 50 spilarar á Íslandi.' : 'Stig meðal vina.'}
+                <Text
+                    className="text-[44px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center mb-1"
+                    style={{ textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
+                >
+                    Stigatafla.
+                </Text>
+                <Text className="text-[18px] font-medium font-serif italic text-slate-500 tracking-wide text-center">
+                    {viewMode === 'global' ? 'Topp 50 spilarar' : 'Stig meðal vina.'}
                 </Text>
             </View>
 
             {currentUserId && (
                 <View className="flex-row mx-6 mb-6 bg-slate-200/50 rounded-2xl p-1.5 shadow-sm">
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         activeOpacity={0.8}
                         className="flex-1 items-center py-3 rounded-xl"
                         style={viewMode === 'global' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 } : {}}
                         onPress={() => setViewMode('global')}
                     >
-                        <Text className={`font-black tracking-wide ${viewMode === 'global' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}>Allir</Text>
+                        <Text
+                            className={`font-black tracking-wide ${viewMode === 'global' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}
+                            style={viewMode === 'global' ? { textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 0 } : {}}
+                        >
+                            Allir
+                        </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         activeOpacity={0.8}
                         className="flex-1 items-center py-3 rounded-xl"
                         style={viewMode === 'friends' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 } : {}}
                         onPress={() => setViewMode('friends')}
                     >
-                        <Text className={`font-black tracking-wide ${viewMode === 'friends' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}>Vinir</Text>
+                        <Text
+                            className={`font-black tracking-wide ${viewMode === 'friends' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}
+                            style={viewMode === 'friends' ? { textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 0 } : {}}
+                        >
+                            Vinir
+                        </Text>
                     </TouchableOpacity>
                 </View>
             )}

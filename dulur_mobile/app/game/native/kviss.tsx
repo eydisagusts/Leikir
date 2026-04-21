@@ -6,8 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Share, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, { SlideInRight, SlideOutLeft, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { Animated } from 'react-native';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import { supabase } from '@/lib/supabase';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
@@ -44,24 +45,24 @@ export default function NativeKviss() {
     const [isFreshGameOver, setIsFreshGameOver] = useState(false);
     const [finalTime, setFinalTime] = useState(0);
 
-    const xpAnimY = useSharedValue(0);
-    const xpAnimOpacity = useSharedValue(1);
+    const xpAnimY = React.useRef(new Animated.Value(0)).current;
+    const xpAnimOpacity = React.useRef(new Animated.Value(1)).current;
 
-    const flyStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ translateY: xpAnimY.value }],
-            opacity: xpAnimOpacity.value,
-        };
-    });
+    const flyStyle = {
+        transform: [{ translateY: xpAnimY }],
+        opacity: xpAnimOpacity,
+    };
 
     const handleCloseModal = () => {
         setIsFreshGameOver(false);
         if (earnedXp && earnedXp > 0) {
             setShowFlyXp(true);
-            xpAnimY.value = 0;
-            xpAnimOpacity.value = 1;
-            xpAnimY.value = withTiming(-350, { duration: 1200 });
-            xpAnimOpacity.value = withTiming(0, { duration: 1200 });
+            xpAnimY.setValue(0);
+            xpAnimOpacity.setValue(1);
+            Animated.parallel([
+                Animated.timing(xpAnimY, { toValue: -350, duration: 1200, useNativeDriver: true }),
+                Animated.timing(xpAnimOpacity, { toValue: 0, duration: 1200, useNativeDriver: true })
+            ]).start();
             setTimeout(() => {
                 setShowFlyXp(false);
                 DeviceEventEmitter.emit('xp-earned', earnedXp);
@@ -92,51 +93,64 @@ export default function NativeKviss() {
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/kviss/init`);
-                if (!res.ok) throw new Error('API down');
-                const data: KvissGameData = await res.json();
-                setGame(data);
+                const today = new Date().toISOString().split('T')[0];
                 
-                const { data: { user } } = await supabase.auth.getUser();
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/kviss/init`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_results')
+                        .select('score')
+                        .eq('user_id', user.id)
+                        .eq('game_type', 'kviss')
+                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
+                    supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', `kviss_${today}`).maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [data, [resDataRes, stateDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
+
+                setGame(data as KvissGameData);
+                
                 if (!user) {
                     setGameState('playing');
                     return;
                 }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: resData } = await supabase.from('game_results')
-                    .select('score')
-                    .eq('user_id', user.id)
-                    .eq('game_type', 'kviss')
-                    .gte('played_at', `${today}T00:00:00Z`).single();
-                
-                if (resData) {
-                    setGameState('won');
-                    setScore(resData.score);
-                } else {
-                    const { data: stateData } = await supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', `kviss_${today}`).single();
-                    if (stateData && stateData.state_json) {
-                        const cur = stateData.state_json.currentIndex || 0;
-                        setCurrentIndex(cur);
-                        setScore(stateData.state_json.score || 0);
+                const resData = resDataRes.data;
+                const stateData = stateDataRes.data;
 
-                        // If uncompleted question exists, check timer
-                        if (cur < 5 && stateData.state_json.questionStartedAt) {
-                            const qAt = stateData.state_json.questionStartedAt;
-                            const elapsedSec = Math.floor((Date.now() - qAt) / 1000);
-                            const remaining = Math.max(0, 10 - elapsedSec);
-                            setTimeLeft(remaining);
-                            setQuestionStartedAt(qAt);
-                        } else {
-                            const now = Date.now();
-                            setQuestionStartedAt(now);
-                            setTimeLeft(10);
-                        }
-                    } else {
+                if (stateData && stateData.state_json) {
+                    const cur = stateData.state_json.currentIndex || 0;
+                    setCurrentIndex(cur);
+                    setScore(stateData.state_json.score || 0);
+
+                    // If uncompleted question exists, check timer
+                    if (cur < 5 && stateData.state_json.questionStartedAt && !resData) {
+                        const qAt = stateData.state_json.questionStartedAt;
+                        const elapsedSec = Math.floor((Date.now() - qAt) / 1000);
+                        const remaining = Math.max(0, 10 - elapsedSec);
+                        setTimeLeft(remaining);
+                        setQuestionStartedAt(qAt);
+                    } else if (!resData) {
                         const now = Date.now();
                         setQuestionStartedAt(now);
                         setTimeLeft(10);
                     }
+                } else if (!resData) {
+                    const now = Date.now();
+                    setQuestionStartedAt(now);
+                    setTimeLeft(10);
+                }
+
+                if (resData) {
+                    setGameState('won');
+                } else {
                     setGameState('playing');
                 }
             } catch (err) {
@@ -168,7 +182,7 @@ export default function NativeKviss() {
     }, [gameState, isTransitioning, selectedIdx, questionStartedAt, game]);
 
     const handleSelectOption = (idx: number, isTimeout = false) => {
-        if (isTransitioning || selectedIdx !== null || !game) return;
+        if (gameState !== 'playing' || isTransitioning || selectedIdx !== null || !game) return;
         
         setSelectedIdx(idx);
         setIsTransitioning(true);
@@ -226,20 +240,30 @@ export default function NativeKviss() {
         if (!user) return;
 
         let elapsed = 0;
-        const date = new Date().toLocaleDateString('en-CA');
+        const date = new Date().toISOString().split('T')[0];
         const key = `timer_${user.id}_kviss_${date}`;
         const savedTime = await AsyncStorage.getItem(key);
-        if (savedTime) elapsed = parseInt(savedTime, 10);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 0;
         
         setFinalTime(elapsed);
 
-        await supabase.from('game_results').insert({
+        const { error } = await supabase.from('game_results').insert({
             time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: 'kviss',
             score: finalScore,
-            won: finalScore === 5
+            won: finalScore === 5,
+            metadata: { finalScore } as any
         });
+
+        if (error) {
+            console.error("Kviss result insert failed:", error);
+            setTimeout(() => setIsFreshGameOver(true), 1000);
+            return;
+        }
+
+        // Clear local state tracking to prevent infinitely reloading old answers
+        // Removed game_states deletion to preserve state for replay visualization
 
         // XP Reward: 30xp per correct answer
         const xpReward = finalScore * 30;
@@ -247,7 +271,7 @@ export default function NativeKviss() {
             await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
             setEarnedXp(xpReward);
         }
-        setIsFreshGameOver(true);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
     };
 
     if (gameState === 'loading' || !game) {
@@ -266,70 +290,28 @@ export default function NativeKviss() {
             <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
                 <MobileGameLayout onBack={() => router.back()} gameId="kviss" gameTitle="Kviss" isGameOver={gameState !== 'playing'}>
                     
-                    {gameState === 'won' && isFreshGameOver && (
-                        <View className="absolute top-1/4 self-center bg-white px-6 py-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] items-center z-40 w-[85%] max-w-[340px] border border-gray-200">
-                            <TouchableOpacity 
-                                onPress={handleCloseModal}
-                                className="absolute top-4 right-4 p-2 z-50 bg-gray-100 rounded-full"
-                            >
-                                <Ionicons name="close" size={24} color="#64748B" />
-                            </TouchableOpacity>
-
-                            <View className={`w-20 h-20 rounded-full items-center justify-center mb-4 bg-green-100 border-4 border-green-200`}>
-                                <Text className="text-4xl text-green-600 font-bold">{score}/5</Text>
-                            </View>
-
-                            <Text className="text-3xl font-black font-serif text-[#1A1A1B] mb-2">{score === 5 ? 'Meistaralegt!' : score >= 3 ? 'Vel gert!' : 'Gengur betur næst'}</Text>
-                            <Text className="text-base font-medium text-gray-500 mb-6 text-center">Þú svaraðir {score} spurningum réttum!</Text>
-
-                            {earnedXp !== null && earnedXp > 0 && (
-                                <View className="flex-row items-center justify-center bg-yellow-500/10 border-2 border-yellow-500 px-6 py-3 rounded-2xl mb-6">
-                                    <Ionicons name="star" size={20} color="#EAB308" style={{ marginRight: 6 }} />
-                                    <Text className="text-xl font-bold text-yellow-600">+{earnedXp} XP</Text>
-                                </View>
-                            )}
-
-                            <View className="w-full space-y-3">
-                                <TouchableOpacity 
-                                    onPress={handleShare} 
-                                    className="w-full flex-row items-center justify-center bg-[#4F46E5] rounded-xl py-4 shadow-sm mb-3"
-                                >
-                                    <Ionicons name="share-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                                    <Text className="text-white font-bold text-lg">Deila Niðurstöðu</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity 
-                                    onPress={handleCloseModal}
-                                    className="w-full flex-row items-center justify-center bg-gray-100 rounded-xl py-4"
-                                >
-                                    <Text className="text-gray-600 font-bold text-lg">Áfram</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
+                    <NativeGameEndModal
+                gameTitle="Kviss"
+                        visible={gameState === 'won' && isFreshGameOver}
+                        gameState="won"
+                        xpEarned={earnedXp}
+                        winTitle={score === 5 ? 'Meistaralegt!' : score >= 3 ? 'Vel gert!' : 'Gengur betur næst'}
+                        winDesc={`Þú svaraðir ${score} spurningum réttum!`}
+                        onContinue={handleCloseModal}
+                        primaryButtonText="Deila niðurstöðu"
+                        onPrimaryAction={handleShare}
+                    />
 
                     {showFlyXp && earnedXp !== null && earnedXp > 0 && (
                         <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
-                            <View className="bg-yellow-500 flex-row items-center px-6 py-3 rounded-full shadow-lg border-2 border-white">
-                                <Ionicons name="star" size={24} color="white" style={{ marginRight: 8 }} />
-                                <Text className="text-white font-black text-2xl">+{earnedXp} XP</Text>
+                            <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                                <Ionicons name="star" size={16} color="white" />
+                                <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                             </View>
                         </Animated.View>
                     )}
 
-                    {!isFreshGameOver && gameState === 'won' && (
-                        <View className="flex-1 items-center justify-center w-full px-6">
-                            <Text className="text-7xl mb-4">{score === 5 ? '🔥' : score >= 3 ? '👏' : '😬'}</Text>
-                            <Text className="text-[#1A1A1B] text-3xl font-black uppercase tracking-widest text-center">{score === 5 ? 'Fullkomið!' : score >= 3 ? 'Vel gert!' : 'Gengur betur næst..'}</Text>
-                            <View className="flex-row items-center mt-12 bg-white px-10 py-6 rounded-3xl shadow-sm border border-[#D3D6DA]">
-                                <Text className="text-[#1A1A1B] font-black text-6xl tracking-tighter">{score}</Text>
-                                <Text className="text-gray-400 font-black text-4xl mt-3 mx-2">/</Text>
-                                <Text className="text-gray-400 font-black text-6xl tracking-tighter mt-1">5</Text>
-                            </View>
-                        </View>
-                    )}
-
-                    {gameState === 'playing' && (
-                        <>
+                    <>
                             {/* Question Pagination Meta */}
                             <View className="w-full px-6 pt-2 pb-4 items-center">
                                 <View className="bg-[#E5E7EB] px-6 py-1.5 rounded-full">
@@ -360,10 +342,8 @@ export default function NativeKviss() {
                             </View>
 
                             <View className="flex-1 overflow-visible relative">
-                                <Animated.View 
+                                <View 
                                     key={currentIndex} 
-                                    entering={SlideInRight.duration(300).springify().damping(18)} 
-                                    exiting={SlideOutLeft.duration(200)}
                                     style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 12 }}
                                 >
                                     <Text className="text-[#1A1A1B] font-black text-2xl sm:text-3xl leading-snug font-serif mb-8 text-center">
@@ -421,10 +401,9 @@ export default function NativeKviss() {
                                             );
                                         })}
                                     </View>
-                                </Animated.View>
+                                </View>
                             </View>
                         </>
-                    )}
 
                 </MobileGameLayout>
             </SafeAreaView>

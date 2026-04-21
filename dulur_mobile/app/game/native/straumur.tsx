@@ -9,6 +9,7 @@ import Svg, { Polyline, Circle } from 'react-native-svg';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 const { width } = Dimensions.get('window');
@@ -96,30 +97,43 @@ export default function NativeStraumur() {
     useEffect(() => {
         async function init() {
             try {
-                const res = await fetch(`${API_URL}/api/mobile/straumur/init`);
-                if (!res.ok) throw new Error('API down');
-                const data: StraumurGameData = await res.json();
-                setGame(data);
+                const today = new Date().toISOString().split('T')[0];
                 
-                const { data: { user } } = await supabase.auth.getUser();
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/straumur/init`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                const dbPromises = user ? Promise.all([
+                    supabase.from('game_results')
+                        .select('won')
+                        .eq('user_id', user.id)
+                        .eq('game_type', 'straumur')
+                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `straumur_${today}`).maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+                const [data, [resDataRes, stateDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
+
+                setGame(data as StraumurGameData);
+                
                 if (!user) {
                     setGameState('playing');
                     return;
                 }
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: resData } = await supabase.from('game_results')
-                    .select('won')
-                    .eq('user_id', user.id)
-                    .eq('game_type', 'straumur')
-                    .gte('played_at', `${today}T00:00:00Z`).single();
-                
+                const resData = resDataRes.data;
+                const stateData = stateDataRes.data;
+
                 if (resData) {
                     setGameState('won');
                     setFoundWords([...data.themeWords.map(t => t.word), data.spangram.word]);
                     setFoundPaths([...data.themeWords.map(t => t.coords), data.spangram.coords]);
                 } else {
-                    const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `straumur_${today}`).single();
                     if (stateData) {
                         setFoundWords(stateData.state_json.foundWords || []);
                         setFoundPaths(stateData.state_json.foundPaths || []);
@@ -193,6 +207,14 @@ export default function NativeStraumur() {
 
         // Check if out of bounds
         if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+        
+        // Exact hit-box logic for diagonal swiping safely
+        const cellCenterX = (c * cellWidth) + (cellWidth / 2);
+        const cellCenterY = (r * cellHeight) + (cellHeight / 2);
+        const distToCenter = Math.sqrt(Math.pow(locationX - cellCenterX, 2) + Math.pow(locationY - cellCenterY, 2));
+
+        // Only register a hit if finger is within the inner 35% radius of the tile (creates gaps for diagonals)
+        if (distToCenter > (cellWidth * 0.35)) return;
         
         // Prevent touching already found words
         const isFound = foundPaths.some(p => p.some(coord => coord.r === r && coord.c === c));
@@ -339,7 +361,7 @@ export default function NativeStraumur() {
                 });
                 await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: 100, p_locale: 'is' });
                 setEarnedXp(100);
-                setIsFreshGameOver(true);
+                setTimeout(() => setIsFreshGameOver(true), 1000);
             }
         }
     };
@@ -418,53 +440,21 @@ export default function NativeStraumur() {
         <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
             <MobileGameLayout onBack={() => router.back()} gameId="straumur" gameTitle="Straumur" scrollEnabled={!isDragging} isGameOver={gameState !== 'playing'}>
                 
-            {gameState === 'won' && !isDragging && isFreshGameOver && (
-                <View className="absolute top-1/4 self-center bg-white px-6 py-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] items-center z-40 w-[85%] max-w-[340px] border border-gray-200">
-                    <TouchableOpacity 
-                        onPress={handleCloseModal}
-                        className="absolute top-4 right-4 p-2 z-50 bg-gray-100 rounded-full"
-                    >
-                        <Ionicons name="close" size={24} color="#64748B" />
-                    </TouchableOpacity>
-
-                    <View className="w-20 h-20 rounded-full items-center justify-center mb-4 bg-green-100 border-4 border-green-200">
-                        <Text className="text-4xl">🏆</Text>
-                    </View>
-
-                    <Text className="text-3xl font-black font-serif text-[#1A1A1B] mb-2">Vel gert!</Text>
-                    <Text className="text-lg font-medium text-gray-500 mb-6 text-center">Þú fannst öll þemaorðin ásamt Spangraminu!</Text>
-
-                    {earnedXp !== null && earnedXp > 0 && (
-                        <View className="flex-row items-center justify-center bg-yellow-500/10 border-2 border-yellow-500 px-6 py-3 rounded-2xl mb-6">
-                            <Ionicons name="star" size={20} color="#EAB308" style={{ marginRight: 6 }} />
-                            <Text className="text-xl font-bold text-yellow-600">+{earnedXp} XP</Text>
-                        </View>
-                    )}
-
-                    <View className="w-full space-y-3">
-                        <TouchableOpacity 
-                            onPress={handleShare} 
-                            className="w-full flex-row items-center justify-center bg-[#4F46E5] rounded-xl py-4 shadow-sm mb-3"
-                        >
-                            <Ionicons name="share-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                            <Text className="text-white font-bold text-lg">Deila Niðurstöðu</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity 
-                            onPress={handleCloseModal}
-                            className="w-full flex-row items-center justify-center bg-gray-100 rounded-xl py-4"
-                        >
-                            <Text className="text-gray-600 font-bold text-lg">Áfram</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
+            <NativeGameEndModal
+                gameTitle="Straum"
+                visible={gameState === 'won' && !isDragging && isFreshGameOver}
+                gameState="won"
+                xpEarned={earnedXp}
+                winTitle="Vel gert!"
+                winDesc="Þú fannst öll þemaorðin ásamt Spangraminu!"
+                onContinue={handleCloseModal}
+            />
 
             {showFlyXp && earnedXp !== null && earnedXp > 0 && (
                 <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
-                    <View className="bg-yellow-500 flex-row items-center px-6 py-3 rounded-full shadow-lg border-2 border-white">
-                        <Ionicons name="star" size={24} color="white" style={{ marginRight: 8 }} />
-                        <Text className="text-white font-black text-2xl">+{earnedXp} XP</Text>
+                    <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                        <Ionicons name="star" size={16} color="white" />
+                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
                     </View>
                 </Animated.View>
             )}
@@ -521,7 +511,7 @@ export default function NativeStraumur() {
                                     key={`found-${idx}`}
                                     points={getPolylinePoints(path)} 
                                     fill="none" 
-                                    stroke={isSpan ? "#eab308" : "#2563eb"} // Yellow or Blue
+                                    stroke={isSpan ? "#eab308" : "#22C55E"} // Yellow or Green
                                     strokeWidth={CELL_SIZE * 0.7} 
                                     strokeLinecap="round" 
                                     strokeLinejoin="round" 
@@ -534,7 +524,7 @@ export default function NativeStraumur() {
                             <Polyline 
                                 points={getPolylinePoints(activePath)} 
                                 fill="none" 
-                                stroke={errorShake ? "#ef4444" : "#93c5fd"} // Red Error or Light Blue Current
+                                stroke={errorShake ? "#ef4444" : "#86efac"} // Red Error or Light Green Current
                                 strokeWidth={CELL_SIZE * 0.7} 
                                 strokeLinecap="round" 
                                 strokeLinejoin="round" 
@@ -562,10 +552,10 @@ export default function NativeStraumur() {
                                                 justifyContent: 'center', 
                                                 alignItems: 'center',
                                                 borderWidth: isHinted && !isFound && !isActive ? 3 : 0,
-                                                borderColor: '#93c5fd',
+                                                borderColor: '#86efac',
                                                 borderStyle: 'dashed',
                                                 borderRadius: CELL_SIZE / 2,
-                                                backgroundColor: isHinted && !isFound && !isActive ? 'rgba(59,130,246,0.1)' : 'transparent'
+                                                backgroundColor: isHinted && !isFound && !isActive ? 'rgba(34,197,94,0.1)' : 'transparent'
                                             },
                                             isFound ? { opacity: 0.4, transform: [{ scale: 0.85 }] } : {}
                                         ]}
@@ -595,8 +585,8 @@ export default function NativeStraumur() {
                 {game.themeWords.map((tw, idx) => {
                     const found = foundWords.includes(tw.word);
                     return (
-                        <View key={idx} className={`px-4 py-2 rounded-full border-[2px] ${found ? 'bg-blue-100 border-blue-200' : 'bg-transparent border-gray-200'}`}>
-                            <Text className={`text-sm font-bold tracking-wider ${found ? 'text-blue-900' : 'text-gray-300'}`}>
+                        <View key={idx} className={`px-4 py-2 rounded-full border-[2px] ${found ? 'bg-green-100 border-green-200' : 'bg-transparent border-gray-200'}`}>
+                            <Text className={`text-sm font-bold tracking-wider ${found ? 'text-green-900' : 'text-gray-400'}`}>
                                 {found ? tw.word : "•".repeat(tw.word.length)}
                             </Text>
                         </View>

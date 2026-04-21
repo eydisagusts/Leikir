@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
+import { FontAwesome5 } from '@expo/vector-icons';
+
+// Essential for iOS/Android WebView return resolution
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
@@ -16,6 +22,48 @@ export default function LoginScreen() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) setError(error.message);
         setLoading(false);
+    };
+
+    const handleOAuthLogin = async (provider: 'google' | 'facebook') => {
+        setLoading(true);
+        setError(null);
+        
+        try {
+            // Generates dulur://auth internally to properly match Supabase dashboard redirects
+            const redirectUrl = makeRedirectUri({
+                scheme: 'dulur',
+                path: 'auth'
+            });
+
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: provider,
+                options: {
+                    redirectTo: redirectUrl,
+                    skipBrowserRedirect: true, // We must launch the web browser manually
+                },
+            });
+
+            if (error) throw error;
+
+            if (data?.url) {
+                const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+                if (res.type === 'success' && res.url) {
+                    // Extract session hashes explicitly
+                    const rawUrl = res.url.replace('#', '?');
+                    const urlObj = new URL(rawUrl);
+                    const access_token = urlObj.searchParams.get('access_token');
+                    const refresh_token = urlObj.searchParams.get('refresh_token');
+                    
+                    if (access_token && refresh_token) {
+                        await supabase.auth.setSession({ access_token, refresh_token });
+                    }
+                }
+            }
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -47,6 +95,32 @@ export default function LoginScreen() {
             >
                {loading ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-lg font-sans">Skrá inn</Text>}
             </TouchableOpacity>
+
+            <View className="flex-row items-center w-full my-8">
+                <View className="flex-1 h-[1px] bg-slate-200" />
+                <Text className="text-slate-500 font-sans font-semibold px-4 text-sm">eða skrá inn með</Text>
+                <View className="flex-1 h-[1px] bg-slate-200" />
+            </View>
+
+            <View className="flex-row items-center justify-between w-full gap-4">
+                <TouchableOpacity 
+                   className="flex-1 bg-white border border-slate-200 p-4 rounded-xl flex-row justify-center items-center shadow-sm"
+                   onPress={() => handleOAuthLogin('google')}
+                   disabled={loading}
+                >
+                   <FontAwesome5 name="google" size={18} color="#db4437" />
+                   <Text className="text-slate-700 font-bold ml-2 text-[15px]">Google</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                   className="flex-1 bg-white border border-slate-200 p-4 rounded-xl flex-row justify-center items-center shadow-sm"
+                   onPress={() => handleOAuthLogin('facebook')}
+                   disabled={loading}
+                >
+                   <FontAwesome5 name="facebook" size={18} color="#1877f2" />
+                   <Text className="text-slate-700 font-bold ml-2 text-[15px]">Facebook</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }

@@ -6,9 +6,8 @@ import { WebView } from 'react-native-webview';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function GameHybridWrapper() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const isEvent = useLocalSearchParams<{ isEvent: string }>()?.isEvent === 'true';
+export default function ChallengeHybridWrapper() {
+  const { id } = useLocalSearchParams();
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const insets = useSafeAreaInsets();
@@ -18,7 +17,7 @@ export default function GameHybridWrapper() {
   const [webViewLoaded, setWebViewLoaded] = useState(false);
 
   const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
-  const targetPath = isEvent ? `vidburdur/${id}` : id;
+  const targetPath = `askorun/${id}`;
   
   let gameUrl = `${BASE_URL}/is/${targetPath}?appview=true`;
   if (sessionData?.refresh_token) {
@@ -35,35 +34,30 @@ export default function GameHybridWrapper() {
     setSessionData(session);
     setReady(true);
   };
+
   const INJECTED_JS = `
     (function() {
       const style = document.createElement('style');
       style.innerHTML = \`
-        #mobile-menu, header[class*="sticky"], footer { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-        nav[role="navigation"] { display: none !important; }
+        /* Aggressive CSS to hide all website scaffolding instantly */
+        header.sticky, footer, #mobile-menu, nav[role="navigation"] { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
         
-        body { 
-            background-color: transparent !important; 
-            -webkit-user-select: none;
-            user-select: none;
+        body, html {
+           background-color: transparent !important;
+           -webkit-touch-callout: none;
+           -webkit-user-select: none;
+           user-select: none;
         }
         
-
-
-        #mobile-menu, header[class*="sticky"], footer { display: none !important; }
+        main { padding-top: 0px !important; margin-top: 0px !important; }
+        main > div { padding-top: 0px !important; margin-top: 0px !important; }
       \`;
       document.documentElement.appendChild(style);
       
-      const hideNavBars = () => {
-         const headers = document.querySelectorAll('header, footer, nav');
-         headers.forEach(el => {
-            if (el.tagName === 'FOOTER' || el.classList.contains('sticky') || el.id === 'mobile-menu') {
-                el.style.display = 'none';
-            }
-         });
-      };
-      
-      setInterval(hideNavBars, 100);
+      setInterval(() => {
+         const headers = document.querySelectorAll('header.sticky, footer');
+         headers.forEach(el => el.style.display = 'none');
+      }, 10);
     })();
     true;
   `;
@@ -77,7 +71,7 @@ export default function GameHybridWrapper() {
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <Stack.Screen options={{ headerShown: false, animation: 'fade' }} />
       
       {/* Loading Overlay covers the webview until it perfectly loads */}
@@ -87,15 +81,17 @@ export default function GameHybridWrapper() {
         </View>
       )}
 
-      <View className="w-full self-center" style={{ paddingTop: Math.max(insets.top + 16, 60), paddingBottom: 12, paddingHorizontal: 16, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', zIndex: 100, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 }}>
-          <View className="flex-row items-center justify-between w-full max-w-[500px] self-center">
-              <TouchableOpacity 
-                 onPress={() => router.back()}
-                 className="flex-row items-center bg-slate-100 disabled:opacity-50 px-3 py-2 rounded-xl"
-              >
-                 <Ionicons name="chevron-back" size={18} color="#475569" />
-                 <Text className="text-[15px] font-black text-slate-700 ml-1">Til baka</Text>
-              </TouchableOpacity>
+      <View style={{ top: insets.top + 8 }} className="absolute w-full px-4 self-center max-w-[500px] z-50 pointer-events-box-none">
+          <View className="flex-row items-center justify-between px-4 mt-6 pt-4 pb-2 w-full self-center max-w-[500px]" pointerEvents="box-none">
+              <View className="flex-1 items-start">
+                  <TouchableOpacity 
+                     onPress={() => router.back()}
+                     className="flex-row items-center bg-white border border-gray-200 px-3 py-1.5 rounded-[12px] shadow-sm backdrop-blur-md"
+                  >
+                     <Ionicons name="chevron-back" size={16} color="#64748b" />
+                     <Text className="text-sm font-bold text-slate-500 ml-1">Tilbaka</Text>
+                  </TouchableOpacity>
+              </View>
           </View>
       </View>
       
@@ -104,14 +100,14 @@ export default function GameHybridWrapper() {
         source={{ uri: gameUrl }}
         sharedCookiesEnabled={true}
         injectedJavaScriptBeforeContentLoaded={INJECTED_JS}
-        bounces={true}
-        scrollEnabled={true}
-        showsVerticalScrollIndicator={true}
+        bounces={false}
+        scrollEnabled={false}
+        showsVerticalScrollIndicator={false}
         userAgent="DulurAppMobileWebview"
         onLoadEnd={() => setWebViewLoaded(true)}
         className="flex-1 bg-background"
         style={{ opacity: webViewLoaded ? 1 : 0 }}
       />
-    </View>
+    </SafeAreaView>
   );
 }

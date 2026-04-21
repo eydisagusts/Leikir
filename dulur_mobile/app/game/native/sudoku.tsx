@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, withRepeat } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 const { width } = Dimensions.get('window');
@@ -29,6 +30,47 @@ export default function NativeSudoku() {
     const [xpAvailable, setXpAvailable] = useState<number>(0);
 
     const [gameState, setGameState] = useState<'playing' | 'won' | 'loading' | 'error'>('loading');
+    const [earnedXp, setEarnedXp] = useState<number | null>(null);
+    const [showFlyXp, setShowFlyXp] = useState(false);
+    const [isFreshGameOver, setIsFreshGameOver] = useState(false);
+
+    const xpAnimY = useSharedValue(0);
+    const xpAnimOpacity = useSharedValue(1);
+
+    const handleCloseModal = () => {
+        setIsFreshGameOver(false);
+        if (earnedXp && earnedXp > 0) {
+            setShowFlyXp(true);
+            xpAnimY.value = 0;
+            xpAnimOpacity.value = 1;
+            xpAnimY.value = withTiming(-350, { duration: 1200 });
+            xpAnimOpacity.value = withTiming(0, { duration: 1200 });
+            setTimeout(() => {
+                setShowFlyXp(false);
+                DeviceEventEmitter.emit('xp-earned', earnedXp);
+            }, 1300);
+        }
+    };
+
+    const handleShare = async () => {
+        const header = `Dulur: Sudoku ✏️`;
+        const diffDict: Record<string, string> = { easy: 'Létt', medium: 'Miðlungs', hard: 'Erfitt' };
+        const diffText = diffDict[difficulty] || difficulty;
+        const xpText = earnedXp ? `\n⭐ XP: +${earnedXp}` : '';
+        const message = `${header}\nErfiðleikastig: ${diffText}${xpText}\n\nÉg leysti þraut dagsins!\ndulur.is 🔥`;
+        try {
+            await Share.share({ message });
+        } catch (error) {
+            console.error('Error sharing', error);
+        }
+    };
+
+    const flyStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateY: xpAnimY.value }],
+            opacity: xpAnimOpacity.value,
+        };
+    });
 
     const shakeOffset = useSharedValue(0);
     const shakeStyle = useAnimatedStyle(() => ({
@@ -39,44 +81,58 @@ export default function NativeSudoku() {
         async function init(diff: string) {
             setGameState('loading');
             try {
-                const res = await fetch(`${API_URL}/api/mobile/sudoku/init?difficulty=${diff}`);
-                if (!res.ok) throw new Error('API down');
-                const data = await res.json();
+                const today = new Date().toISOString().split('T')[0];
+                
+                const sessionPromise = supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/sudoku/init?difficulty=${diff}`).then(res => res.json());
+
+                const { data: { session } } = await sessionPromise;
+                const user = session?.user;
+
+                // Fire DB queries only if user exists
+                const dbPromises = user ? Promise.all([
+                    supabase.from('profiles').select('xp').eq('id', user.id).maybeSingle(),
+                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `sudoku_${diff}`).gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `sudoku_${diff}`).maybeSingle()
+                ]) : Promise.resolve([{ data: null }, { data: null }, { data: null }]);
+
+                const [data, [profileRes, resDataRes, stateDataRes]] = await Promise.all([
+                    apiPromise,
+                    dbPromises
+                ]);
                 
                 const curPuz: SudokuPuzzle = data.puzzle[diff] || data.puzzle.easy;
                 setPuzzle(curPuz);
                 setDifficulty(data.difficulty);
                 setNotes({});
-                
-                const { data: { user } } = await supabase.auth.getUser();
+
                 if (!user) {
-                    setUserGrid(curPuz.initial.map(row => [...row]));
+                    setUserGrid(curPuz.initial.map((row: any) => [...row]));
                     setGameState('playing');
                     return; 
                 }
 
-                const { data: profile } = await supabase.from('profiles').select('xp').eq('id', user.id).single();
+                const profile = profileRes.data;
+                const resData = resDataRes.data;
+                const stateData = stateDataRes.data;
+                
                 if (profile) setXpAvailable(profile.xp || 0);
 
-                const today = new Date().toISOString().split('T')[0];
-                const { data: resData } = await supabase.from('game_results')
-                    .select('won')
-                    .eq('user_id', user.id)
-                    .eq('game_type', `sudoku_${data.difficulty}`)
-                    .gte('played_at', `${today}T00:00:00Z`).single();
-                
+                if (stateData && stateData.updated_at.startsWith(today)) {
+                    setUserGrid(stateData.state_json.currentGrid || curPuz.initial.map((row: any) => [...row]));
+                    setNotes(stateData.state_json.notes || {});
+                } else {
+                    setUserGrid(curPuz.initial.map((row: any) => [...row]));
+                    setNotes({});
+                    if (stateData) {
+                        // Removed game_states deletion to preserve state for replay visualization
+                    }
+                }
+
                 if (resData) {
                     setGameState('won');
-                    setUserGrid(curPuz.solution.map(r => [...r]));
                 } else {
-                    const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `sudoku_${data.difficulty}`).single();
-                    if (stateData && stateData.updated_at.startsWith(today)) {
-                        setUserGrid(stateData.state_json.currentGrid || curPuz.initial.map(row => [...row]));
-                        setNotes(stateData.state_json.notes || {});
-                    } else {
-                        setUserGrid(curPuz.initial.map(row => [...row]));
-                        setNotes({});
-                    }
+                    // Timer will start on first interaction
                     setGameState('playing');
                 }
             } catch (err) {
@@ -130,6 +186,17 @@ export default function NativeSudoku() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedRow(r);
         setSelectedCol(c);
+    };
+
+    const isNumberCompleted = (num: number) => {
+        if (!userGrid || userGrid.length === 0) return false;
+        let count = 0;
+        for (let r = 0; r < 9; r++) {
+            for (let c = 0; c < 9; c++) {
+                if (userGrid[r][c] === num) count++;
+            }
+        }
+        return count >= 9;
     };
 
     const handleNumPad = (num: number) => {
@@ -254,6 +321,8 @@ export default function NativeSudoku() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         DeviceEventEmitter.emit('stop-timer');
         setGameState('won');
+        setEarnedXp(100);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -364,7 +433,26 @@ export default function NativeSudoku() {
                 </View>
             </View>
 
-            {gameState === 'won' && (
+            <NativeGameEndModal
+                gameTitle="Sudoku"
+                visible={gameState === 'won' && isFreshGameOver}
+                gameState="won"
+                xpEarned={earnedXp}
+                winTitle="Vel gert!"
+                winDesc="Þú leystir Sudoku þrautina."
+                onContinue={handleCloseModal}
+            />
+
+            {showFlyXp && earnedXp !== null && earnedXp > 0 && (
+                <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
+                    <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                        <Ionicons name="star" size={16} color="white" />
+                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
+                    </View>
+                </Animated.View>
+            )}
+
+            {!isFreshGameOver && gameState === 'won' && (
                 <View className="bg-emerald-600 mb-6 mx-6 rounded-2xl py-3 justify-center items-center shadow-lg shadow-emerald-600/30">
                     <Text className="text-white font-black uppercase tracking-widest text-lg">Þraut Leyst!</Text>
                 </View>
@@ -435,28 +523,36 @@ export default function NativeSudoku() {
 
             <View className="flex-1 justify-end mt-6 pb-12 px-6">
                 <View className="flex-row justify-between mb-4 mt-2">
-                    {[1,2,3,4,5].map(num => (
+                    {[1,2,3,4,5].map(num => {
+                        const isCompleted = isNumberCompleted(num);
+                        return (
                         <TouchableOpacity 
                             key={num}
                             activeOpacity={0.7}
+                            disabled={isCompleted}
                             onPress={() => handleNumPad(num)}
-                            style={{ width: (width - 64) / 5.5, height: 60, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', borderRadius: 12 }}
+                            style={{ width: (width - 64) / 5.5, height: 60, backgroundColor: '#E5E7EB', opacity: isCompleted ? 0.3 : 1, justifyContent: 'center', alignItems: 'center', borderRadius: 12 }}
                         >
                             <Text style={{ color: '#1A1A1B', fontSize: 24, fontWeight: 'bold' }}>{num}</Text>
                         </TouchableOpacity>
-                    ))}
+                        );
+                    })}
                 </View>
                 <View className="flex-row justify-between">
-                    {[6,7,8,9].map(num => (
+                    {[6,7,8,9].map(num => {
+                        const isCompleted = isNumberCompleted(num);
+                        return (
                         <TouchableOpacity 
                             key={num}
                             activeOpacity={0.7}
+                            disabled={isCompleted}
                             onPress={() => handleNumPad(num)}
-                            style={{ width: (width - 64) / 5.5, height: 60, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', borderRadius: 12 }}
+                            style={{ width: (width - 64) / 5.5, height: 60, backgroundColor: '#E5E7EB', opacity: isCompleted ? 0.3 : 1, justifyContent: 'center', alignItems: 'center', borderRadius: 12 }}
                         >
                             <Text style={{ color: '#1A1A1B', fontSize: 24, fontWeight: 'bold' }}>{num}</Text>
                         </TouchableOpacity>
-                    ))}
+                        );
+                    })}
                     <TouchableOpacity 
                         activeOpacity={0.7}
                         onPress={handleClear}

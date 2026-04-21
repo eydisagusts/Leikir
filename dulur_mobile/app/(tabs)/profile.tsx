@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
 export default function ProfileScreen() {
     const [profile, setProfile] = useState<any>(null);
@@ -15,7 +18,7 @@ export default function ProfileScreen() {
     const [pushMonthlyEvents, setPushMonthlyEvents] = useState(false);
     const [pushLeaderboardPass, setPushLeaderboardPass] = useState(false);
     const [pushLeaderboardTop3, setPushLeaderboardTop3] = useState(false);
-    
+
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -33,7 +36,7 @@ export default function ProfileScreen() {
                 setProfile(data);
                 setUsername(data.username || '');
                 const ns = data.notification_settings || {};
-                
+
                 setPushDailyGames(ns.push_daily_games ?? false);
                 setPushFriendRequests(ns.push_friend_requests ?? false);
                 setPushFriendChallenges(ns.push_friend_challenges ?? false);
@@ -52,27 +55,87 @@ export default function ProfileScreen() {
         }
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
-        
+
         await supabase.from('profiles').update({ username }).eq('id', session.user.id);
         Alert.alert('Vistað', 'Notandanafn hefur verið uppfært.');
     };
 
-    const handleSaveNotifications = async () => {
+    const handleSaveNotifications = async (key: string, value: boolean) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
-        await supabase.from('profiles').update({ 
-            notification_settings: { 
-                push_daily_games: pushDailyGames,
-                push_friend_requests: pushFriendRequests,
-                push_friend_challenges: pushFriendChallenges,
-                push_challenge_results: pushChallengeResults,
-                push_monthly_events: pushMonthlyEvents,
-                push_leaderboard_pass: pushLeaderboardPass,
-                push_leaderboard_top3: pushLeaderboardTop3
+
+        let expoPushToken = null;
+        const willHaveAnyActive = value === true ||
+            (key !== 'push_daily_games' && pushDailyGames) ||
+            (key !== 'push_friend_requests' && pushFriendRequests) ||
+            (key !== 'push_friend_challenges' && pushFriendChallenges) ||
+            (key !== 'push_challenge_results' && pushChallengeResults) ||
+            (key !== 'push_monthly_events' && pushMonthlyEvents) ||
+            (key !== 'push_leaderboard_pass' && pushLeaderboardPass) ||
+            (key !== 'push_leaderboard_top3' && pushLeaderboardTop3);
+
+        if (willHaveAnyActive) {
+            expoPushToken = await registerForPushNotificationsAsync();
+        }
+
+        const currentSettings = {
+            push_daily_games: pushDailyGames,
+            push_friend_requests: pushFriendRequests,
+            push_friend_challenges: pushFriendChallenges,
+            push_challenge_results: pushChallengeResults,
+            push_monthly_events: pushMonthlyEvents,
+            push_leaderboard_pass: pushLeaderboardPass,
+            push_leaderboard_top3: pushLeaderboardTop3
+        };
+
+        const updateData: any = {
+            notification_settings: {
+                ...currentSettings,
+                [key]: value
             }
-        }).eq('id', session.user.id);
-        Alert.alert('Vistað', 'Tilkynningar hafa verið uppfærðar.');
+        };
+
+        if (expoPushToken) updateData.expo_push_token = expoPushToken;
+
+        const { error } = await supabase.from('profiles').update(updateData).eq('id', session.user.id);
+
+        if (error) {
+            console.error('Error updating notification settings:', error);
+            Alert.alert('Villa', 'Gat ekki vistað stillingar vegna ytri kerfisvillu. Endilega reyndu aftur.');
+        }
     };
+
+
+    async function registerForPushNotificationsAsync() {
+        let token;
+
+        if (Device.isDevice) {
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+
+            if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
+            }
+
+            if (finalStatus !== 'granted') {
+                Alert.alert('Villa', 'Þú verður að leyfa tilkynningar í stillingum símans til að þetta virki!');
+                return undefined;
+            }
+
+            const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+
+            try {
+                token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+            } catch (e) {
+                console.error(e);
+            }
+        } else {
+            console.log('Must use physical device for Push Notifications');
+        }
+
+        return token;
+    }
 
     const handleSavePassword = async () => {
         if (!currentPassword) {
@@ -83,7 +146,7 @@ export default function ProfileScreen() {
             Alert.alert('Villa', 'Lykilorð stemma ekki eða eru of stutt (Að minnsta kosti 6 stafir).');
             return;
         }
-        
+
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user?.email) return;
 
@@ -115,18 +178,20 @@ export default function ProfileScreen() {
             'Ertu viss um að þú viljir eyða aðganginum þínum varanlega? Þetta er ekki hægt að afturkalla.',
             [
                 { text: 'Hætta við', style: 'cancel' },
-                { text: 'Eyða', style: 'destructive', onPress: async () => {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session?.user) {
-                        try {
-                            await supabase.rpc('delete_user', { payload_user_id: session.user.id });
-                        } catch (e) {
-                            // Silently fail to ensure local signout completes
+                {
+                    text: 'Eyða', style: 'destructive', onPress: async () => {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        if (session?.user) {
+                            try {
+                                await supabase.rpc('delete_user', { payload_user_id: session.user.id });
+                            } catch (e) {
+                                // Silently fail to ensure local signout completes
+                            }
                         }
+                        await supabase.auth.signOut();
+                        router.replace('/login');
                     }
-                    await supabase.auth.signOut();
-                    router.replace('/login');
-                }}
+                }
             ]
         );
     };
@@ -137,186 +202,155 @@ export default function ProfileScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <View className="px-6 pt-2 pb-6 flex-row justify-between items-center">
-                <Text className="font-serif text-[32px] font-black tracking-tight text-[#1c1917]">Prófíll</Text>
-                <TouchableOpacity onPress={handleLogout} className="bg-red-50 p-2 px-4 rounded-full">
-                    <Text className="text-red-500 font-bold font-sans">Skrá út</Text>
-                </TouchableOpacity>
+        <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top']}>
+            <View className="pt-6 pb-4 bg-[#FAFAFA] border-b border-slate-100 px-6 flex-row items-baseline justify-between z-10">
+                <View style={{ flex: 1 }} />
+                <Text 
+                    className="text-[32px] md:text-[36px] font-black font-serif tracking-tight text-[#1e1b4b] text-center mb-1"
+                    style={{ textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
+                >
+                    Stillingar
+                </Text>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <TouchableOpacity onPress={handleLogout}>
+                        <Text className="text-red-500 font-bold text-[15px]">Skrá út</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
-            <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 150 }}>
-                <View className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6">
-                    <Text className="font-serif font-black text-2xl mb-1 text-[#1c1917]">Aðgangsupplýsingar</Text>
-                    <Text className="font-bold text-slate-800 mb-4 text-base">Breyta Notendanafni</Text>
-                    
-                    <TextInput 
-                        value={username}
-                        onChangeText={setUsername}
-                        placeholderTextColor="#94a3b8"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl h-14 px-4 font-sans text-lg font-semibold text-[#1c1917] shadow-sm mb-2"
-                        placeholder={profile?.username || 'Veldu notandanafn'}
-                        autoCapitalize="none"
-                        style={{ paddingVertical: 0, margin: 0, includeFontPadding: false }}
-                    />
-                    <Text className="text-slate-500 text-sm mb-5">Lágmark 3 og hámark 20 stafir. Engin bil.</Text>
-
-                    <TouchableOpacity onPress={handleSaveUsername} className="w-full bg-[#1c1917] py-3.5 rounded-2xl items-center shadow-md">
-                        <Text className="text-white font-bold text-base">Vista</Text>
+            <ScrollView className="flex-1 px-4 mt-6" contentContainerStyle={{ paddingBottom: 150 }}>
+                {/* Account Details */}
+                <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Aðgangur</Text>
+                <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
+                    <View className="p-4 border-b border-gray-50 flex-col gap-3">
+                        <Text className="font-semibold text-[16px] text-slate-800">Notandanafn</Text>
+                        <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                            <Ionicons name="pencil" size={16} color="#64748b" />
+                            <TextInput
+                                value={username}
+                                onChangeText={setUsername}
+                                placeholderTextColor="#94a3b8"
+                                className="flex-1 ml-3 font-semibold text-[#1c1917] text-[16px]"
+                                placeholder={profile?.username || 'Nýtt notandanafn...'}
+                                autoCapitalize="none"
+                                style={{ paddingVertical: 0, margin: 0 }}
+                            />
+                        </View>
+                    </View>
+                    <TouchableOpacity onPress={handleSaveUsername} className="p-4 flex-row justify-center items-center gap-2 bg-indigo-50/30 active:bg-indigo-50">
+                        <Ionicons name="checkmark-circle" size={18} color="#4f46e5" />
+                        <Text className="text-indigo-600 font-bold text-[15px]">Vista Breytingar</Text>
                     </TouchableOpacity>
                 </View>
 
-                <View className="bg-white rounded-3xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-                    <View className="p-5 border-b border-gray-50 bg-[#fafaf9]">
-                        <Text className="font-serif font-bold text-xl text-[#1c1917]">Tilkynningar</Text>
-                        <Text className="text-slate-500 font-sans text-sm mt-1">Hvaða tilkynningar viltu fá í símann?</Text>
+                {/* Notifications Group */}
+                <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Tilkynningar í síma</Text>
+                <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
+
+                    <View className="p-4 border-b border-gray-50 flex-row justify-between items-center bg-white">
+                        <View className="flex-1 pr-4">
+                            <Text className="font-semibold text-slate-800 text-[16px]">Daglegir leikir</Text>
+                        </View>
+                        <Switch value={pushDailyGames} onValueChange={(val) => { setPushDailyGames(val); handleSaveNotifications('push_daily_games', val); }} trackColor={{ true: '#4f46e5' }} />
                     </View>
-                    
-                    <View className="p-2">
-                        {/* Daglegir */}
-                        <View className="p-3 border-b border-slate-50 flex-row justify-between items-center">
-                            <View className="flex-1 pr-4">
-                                <Text className="font-bold text-slate-800 mb-1">Daglegir leikir</Text>
-                                <Text className="text-slate-500 text-xs leading-5">Fáðu áminningu á morgnana þegar nýir daglegir leikir eru mættir.</Text>
-                            </View>
-                            <Switch value={pushDailyGames} onValueChange={setPushDailyGames} />
+
+                    <View className="p-4 border-b border-gray-50 flex-row justify-between items-center bg-white">
+                        <View className="flex-1 pr-4">
+                            <Text className="font-semibold text-slate-800 text-[16px]">Vinabeiðnir</Text>
                         </View>
-                        
-                        {/* Vinabeiðnir */}
-                        <View className="p-3 border-b border-slate-50 flex-row justify-between items-center">
-                            <View className="flex-1 pr-4">
-                                <Text className="font-bold text-slate-800 mb-1">Vinabeiðnir</Text>
-                                <Text className="text-slate-500 text-xs leading-5">Fáðu tilkynningu þegar einhver sendir þér vinabeiðni.</Text>
-                            </View>
-                            <Switch value={pushFriendRequests} onValueChange={setPushFriendRequests} />
+                        <Switch value={pushFriendRequests} onValueChange={(val) => { setPushFriendRequests(val); handleSaveNotifications('push_friend_requests', val); }} trackColor={{ true: '#4f46e5' }} />
+                    </View>
+
+                    <View className="p-4 border-b border-gray-50 flex-row justify-between items-center bg-white">
+                        <View className="flex-1 pr-4">
+                            <Text className="font-semibold text-slate-800 text-[16px]">Nýjar áskoranir</Text>
                         </View>
-                        
-                        {/* Nýjar Áskoranir */}
-                        <View className="p-3 border-b border-slate-50 flex-row justify-between items-center">
-                            <View className="flex-1 pr-4">
-                                <Text className="font-bold text-slate-800 mb-1">Nýjar áskoranir</Text>
-                                <Text className="text-slate-500 text-xs leading-5">Fáðu tilkynningu þegar vinur skorar á þig í leik.</Text>
-                            </View>
-                            <Switch value={pushFriendChallenges} onValueChange={setPushFriendChallenges} />
+                        <Switch value={pushFriendChallenges} onValueChange={(val) => { setPushFriendChallenges(val); handleSaveNotifications('push_friend_challenges', val); }} trackColor={{ true: '#4f46e5' }} />
+                    </View>
+
+                    <View className="p-4 border-b border-gray-50 flex-row justify-between items-center bg-white">
+                        <View className="flex-1 pr-4">
+                            <Text className="font-semibold text-slate-800 text-[16px]">Úrslit áskorana</Text>
                         </View>
-                        
-                        {/* Niðurstöður áskorana */}
-                        <View className="p-3 border-b border-slate-50 flex-row justify-between items-center">
-                            <View className="flex-1 pr-4">
-                                <Text className="font-bold text-slate-800 mb-1">Niðurstöður úr áskorunum</Text>
-                                <Text className="text-slate-500 text-xs leading-5">Fáðu tilkynningu þegar áskorun lýkur og sigurvegari hefur verið krýndur.</Text>
-                            </View>
-                            <Switch value={pushChallengeResults} onValueChange={setPushChallengeResults} />
+                        <Switch value={pushChallengeResults} onValueChange={(val) => { setPushChallengeResults(val); handleSaveNotifications('push_challenge_results', val); }} trackColor={{ true: '#4f46e5' }} />
+                    </View>
+
+                    <View className="p-4 border-b border-gray-50 flex-row justify-between items-center bg-white">
+                        <View className="flex-1 pr-4">
+                            <Text className="font-semibold text-slate-800 text-[16px]">Nýir viðburðir</Text>
                         </View>
-                        
-                        {/* Viðburðir */}
-                        <View className="p-3 border-b border-slate-50 flex-row justify-between items-center">
-                            <View className="flex-1 pr-4">
-                                <Text className="font-bold text-slate-800 mb-1">Mánaðarlegir viðburðir</Text>
-                                <Text className="text-slate-500 text-xs leading-5">Fáðu tilkynningu þegar nýr sérstakur viðburður hefst á Dulur.</Text>
-                            </View>
-                            <Switch value={pushMonthlyEvents} onValueChange={setPushMonthlyEvents} />
+                        <Switch value={pushMonthlyEvents} onValueChange={(val) => { setPushMonthlyEvents(val); handleSaveNotifications('push_monthly_events', val); }} trackColor={{ true: '#4f46e5' }} />
+                    </View>
+
+                    <View className="p-4 border-b border-gray-50 flex-row justify-between items-center bg-white">
+                        <View className="flex-1 pr-4">
+                            <Text className="font-semibold text-slate-800 text-[16px]">Misstir sæti á töflu</Text>
                         </View>
-                        
-                        {/* Framúrakstur */}
-                        <View className="p-3 border-b border-slate-50 flex-row justify-between items-center">
-                            <View className="flex-1 pr-4">
-                                <Text className="font-bold text-slate-800 mb-1">Stigatafla - Misstiru sæti?</Text>
-                                <Text className="text-slate-500 text-xs leading-5">Fáðu tilkynningu þegar vinur tekur fram úr þér á stigatöflunni.</Text>
-                            </View>
-                            <Switch value={pushLeaderboardPass} onValueChange={setPushLeaderboardPass} />
-                        </View>
-                        
-                        {/* Topp 3 */}
-                        <View className="p-3 flex-row justify-between items-center mb-3">
-                            <View className="flex-1 pr-4">
-                                <Text className="font-bold text-slate-800 mb-1">Stigatafla - Topp 3 Í hættu</Text>
-                                <Text className="text-slate-500 text-xs leading-5">Fáðu tilkynningu ef þú ert í topp 3 og einhver tekur sætið þitt.</Text>
-                            </View>
-                            <Switch value={pushLeaderboardTop3} onValueChange={setPushLeaderboardTop3} />
-                        </View>
-                        
-                        <View className="px-3 pb-3">
-                            <TouchableOpacity onPress={handleSaveNotifications} className="w-full bg-indigo-50 border border-indigo-100 py-3 rounded-xl items-center shadow-sm">
-                                <Text className="text-indigo-600 font-bold text-sm">Vista stillingar tilkynninga</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <Switch value={pushLeaderboardPass} onValueChange={(val) => { setPushLeaderboardPass(val); handleSaveNotifications('push_leaderboard_pass', val); }} trackColor={{ true: '#4f46e5' }} />
                     </View>
                 </View>
 
                 {/* Change Password */}
-                <View className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6">
-                    <Text className="font-serif font-black text-2xl mb-6 text-[#1c1917]">Öryggi & lykilorð</Text>
-                    
-                    <TextInput 
-                        value={currentPassword}
-                        onChangeText={setCurrentPassword}
-                        secureTextEntry
-                        placeholderTextColor="#94a3b8"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl h-14 px-4 font-sans text-base font-semibold text-[#1c1917] shadow-sm mb-4"
-                        style={{ paddingVertical: 0, margin: 0, includeFontPadding: false }}
-                        placeholder="Núverandi lykilorð"
-                    />
-                    
-                    <TextInput 
-                        value={newPassword}
-                        onChangeText={setNewPassword}
-                        secureTextEntry
-                        placeholderTextColor="#94a3b8"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl h-14 px-4 font-sans text-base font-semibold text-[#1c1917] shadow-sm mb-3"
-                        style={{ paddingVertical: 0, margin: 0, includeFontPadding: false }}
-                        placeholder="Nýtt lykilorð"
-                    />
-                    <TextInput 
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        secureTextEntry
-                        placeholderTextColor="#94a3b8"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl h-14 px-4 font-sans text-base font-semibold text-[#1c1917] shadow-sm mb-2"
-                        style={{ paddingVertical: 0, margin: 0, includeFontPadding: false }}
-                        placeholder="Staðfesta nýtt lykilorð"
-                    />
-                    <Text className="text-slate-500 text-sm mb-5">Að minnsta kosti 6 stafir.</Text>
-
-                    <TouchableOpacity onPress={handleSavePassword} className="w-full bg-[#1c1917] py-3.5 rounded-2xl items-center shadow-md">
-                        <Text className="text-white font-bold text-base">Vista lykilorð</Text>
+                <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Öryggi</Text>
+                <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
+                    <View className="p-4 border-b border-gray-50 flex-col">
+                        <TextInput
+                            value={currentPassword}
+                            onChangeText={setCurrentPassword}
+                            secureTextEntry
+                            placeholderTextColor="#94a3b8"
+                            className="font-semibold text-[#1c1917] text-[16px] h-10 border-b border-slate-100 mb-2"
+                            placeholder="Núverandi lykilorð"
+                        />
+                        <TextInput
+                            value={newPassword}
+                            onChangeText={setNewPassword}
+                            secureTextEntry
+                            placeholderTextColor="#94a3b8"
+                            className="font-semibold text-[#1c1917] text-[16px] h-10 border-b border-slate-100 mb-2"
+                            placeholder="Nýtt lykilorð"
+                        />
+                        <TextInput
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                            secureTextEntry
+                            placeholderTextColor="#94a3b8"
+                            className="font-semibold text-[#1c1917] text-[16px] h-10"
+                            placeholder="Staðfesta nýtt lykilorð"
+                        />
+                    </View>
+                    <TouchableOpacity onPress={handleSavePassword} className="p-4 flex-row justify-center bg-slate-50/50">
+                        <Text className="text-indigo-600 font-bold text-[15px]">Uppfæra Lykilorð</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Subscriptions */}
-                <View className={`${profile?.is_subscribed ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-200'} p-6 rounded-3xl shadow-sm border mb-6 relative overflow-hidden`}>
-                    <View className="flex-row items-center mb-2">
-                        <Ionicons name={profile?.is_subscribed ? "diamond" : "lock-closed"} size={24} color={profile?.is_subscribed ? "#4f46e5" : "#64748b"} />
-                        <Text className={`font-serif font-black text-2xl ml-3 ${profile?.is_subscribed ? 'text-indigo-900' : 'text-slate-700'}`}>Þín áskrift</Text>
-                    </View>
-                    
-                    <Text className="text-slate-600 font-sans text-sm mb-4">Hér sérðu hvaða pakka þú ert með.</Text>
-                    
-                    <View className="mb-6 px-4 py-3 bg-white rounded-xl border border-black/5 flex-row items-center justify-between">
-                        <Text className="font-bold text-slate-800 text-lg">
-                            {profile?.is_subscribed ? 'Þú ert í áskrift' : 'Engin áskrift virk'}
+                <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Áskrift</Text>
+                <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
+                    <View className="p-4 flex-row items-center justify-between border-b border-gray-50 bg-white">
+                        <View className="flex-row items-center">
+                            <Ionicons name={profile?.is_subscribed ? "diamond" : "lock-closed"} size={20} color={profile?.is_subscribed ? "#4f46e5" : "#64748b"} />
+                            <Text className={`font-semibold text-[16px] ml-3 ${profile?.is_subscribed ? 'text-indigo-900' : 'text-slate-700'}`}>Staða Áskriftar</Text>
+                        </View>
+                        <Text className="font-bold text-slate-800 text-[15px]">
+                            {profile?.is_subscribed ? 'Virk áskrift' : 'Engin'}
                         </Text>
-                        <Ionicons name={profile?.is_subscribed ? "checkmark-circle" : "close-circle"} size={22} color={profile?.is_subscribed ? "#10b981" : "#ef4444"} />
                     </View>
-                    
-                    <Text className="text-slate-500 font-sans text-sm italic leading-5 mb-4">Eina leiðin til að stýra og kaupa áskrift að safninu er í gegnum vefsíðu okkar. Vinsamlegast farðu á dulur.is í vafra til að breyta áskriftinni þinni.</Text>
-
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         onPress={() => Linking.openURL('https://dulur.is')}
-                        className={`w-full ${profile?.is_subscribed ? 'bg-indigo-600' : 'bg-slate-800'} py-3.5 rounded-xl items-center shadow-sm flex-row justify-center`}
+                        className="p-4 flex-row justify-center items-center bg-slate-50/50"
                     >
-                        <Ionicons name="open-outline" size={18} color="white" />
-                        <Text className="text-white font-bold text-sm ml-2">Stjórna áskrift á dulur.is</Text>
+                        <Ionicons name="open-outline" size={16} color="#4f46e5" />
+                        <Text className="text-indigo-600 font-bold text-[15px] ml-2">Stjórna á dulur.is</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Account Deletion */}
-                <TouchableOpacity 
-                   className="w-full bg-red-50 border border-red-200 p-4 rounded-3xl items-center shadow-sm mb-6 flex-row justify-center"
-                   onPress={handleDeleteAccount}
+                <TouchableOpacity
+                    className="bg-white rounded-2xl border border-red-100 p-4 items-center shadow-sm mb-6 flex-row justify-center"
+                    onPress={handleDeleteAccount}
                 >
-                   <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                   <Text className="text-red-500 font-bold text-base font-sans ml-2">Eyða aðgangi</Text>
+                    <Text className="text-red-500 font-bold text-[16px]">Eyða aðgangi</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>

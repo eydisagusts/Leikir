@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Share } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -57,8 +58,8 @@ export default function FriendsScreen() {
     const [resultModalOpen, setResultModalOpen] = useState(false);
     const [selectedResult, setSelectedResult] = useState<any>(null);
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
+    const fetchData = useCallback(async (isInitial = true) => {
+        if (isInitial) setIsLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             setCurrentUserId(user.id);
@@ -71,12 +72,12 @@ export default function FriendsScreen() {
             if (friendsRes.success) setFriends(friendsRes.friends || []);
             if (challengesRes.success) setChallenges(challengesRes.challenges || []);
         }
-        setIsLoading(false);
+        if (isInitial) setIsLoading(false);
     }, []);
 
     useEffect(() => {
-        fetchData();
-        const interval = setInterval(fetchData, 10000);
+        fetchData(true);
+        const interval = setInterval(() => fetchData(false), 10000);
         return () => clearInterval(interval);
     }, [fetchData]);
 
@@ -101,7 +102,7 @@ export default function FriendsScreen() {
         Alert.alert("Sent", "Vinabeiðni var send!");
         setSearchQuery('');
         setSearchResults([]);
-        fetchData();
+        fetchData(false);
     };
 
     const handleCreateChallenge = async (gameId: string) => {
@@ -111,7 +112,7 @@ export default function FriendsScreen() {
         if (res.success) {
             setChallengeModalOpen(false);
             setActiveTab('askoranir');
-            fetchData();
+            fetchData(false);
         } else {
             Alert.alert("Villa", res.error || "Ekki tókst að búa til áskorun.");
         }
@@ -137,7 +138,7 @@ export default function FriendsScreen() {
                 { text: "Hætta við", style: "cancel" },
                 { text: "Fjarlægja", style: "destructive", onPress: async () => {
                     await removeFriend(friendshipId);
-                    fetchData();
+                    fetchData(false);
                 }}
             ]
         );
@@ -261,14 +262,14 @@ export default function FriendsScreen() {
                             <View className="flex-row gap-3">
                                 <TouchableOpacity activeOpacity={0.7} 
                                     className="flex-1 bg-indigo-600 p-3 rounded-xl items-center flex-row justify-center"
-                                    onPress={async () => { await acceptFriendRequest(f.id); fetchData(); }}
+                                    onPress={async () => { await acceptFriendRequest(f.id); fetchData(false); }}
                                 >
                                     <Ionicons name="checkmark" size={18} color="white" />
                                     <Text className="text-white font-bold ml-1">Samþykkja</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity activeOpacity={0.7} 
                                     className="flex-1 bg-white border border-slate-200 p-3 rounded-xl flex-row justify-center items-center"
-                                    onPress={async () => { await removeFriend(f.id); fetchData(); }}
+                                    onPress={async () => { await removeFriend(f.id); fetchData(false); }}
                                 >
                                     <Ionicons name="close" size={18} color="#64748b" />
                                     <Text className="text-slate-500 font-bold ml-1">Hafna</Text>
@@ -373,7 +374,7 @@ export default function FriendsScreen() {
                                     onPress={async () => { 
                                         const r = await acceptChallenge(c.id);
                                         if (r.success) {
-                                            router.push(`/game/${c.game_type}`); // Assuming global game redirect config.
+                                            router.push(`/askorun/${c.id}`);
                                         }
                                     }}
                                 >
@@ -382,7 +383,7 @@ export default function FriendsScreen() {
                                 </TouchableOpacity>
                                 <TouchableOpacity activeOpacity={0.7} 
                                     className="flex-1 bg-slate-100 p-3 rounded-xl items-center flex-row justify-center"
-                                    onPress={async () => { await declineChallenge(c.id); fetchData(); }}
+                                    onPress={async () => { await declineChallenge(c.id); fetchData(false); }}
                                 >
                                     <Ionicons name="close" size={16} color="#64748b" />
                                     <Text className="text-slate-600 font-bold ml-1.5">Hafna</Text>
@@ -423,7 +424,7 @@ export default function FriendsScreen() {
                                 {myScore === null ? (
                                     <TouchableOpacity activeOpacity={0.7} 
                                        className="bg-blue-600 px-4 py-2.5 rounded-xl shadow-sm"
-                                       onPress={() => router.push(`/game/${c.game_type}`)}
+                                       onPress={() => router.push(`/askorun/${c.id}`)}
                                     >
                                         <Text className="text-white font-bold">Spila</Text>
                                     </TouchableOpacity>
@@ -495,11 +496,12 @@ export default function FriendsScreen() {
     );
 
     return (
-        <View className="flex-1 bg-[#FAFAFA]">
-            {/* Header */}
-            <View className="pt-16 pb-4 bg-white/90 shadow-sm border-b border-slate-100 z-10 items-center justify-center">
-                <Text className="text-3xl font-black font-serif text-[#1e1b4b]">Vinir</Text>
-            </View>
+        <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top']}>
+            <View className="flex-1 bg-[#FAFAFA]">
+                {/* Header */}
+                <View className="pt-6 pb-4 bg-[#FAFAFA] border-b border-slate-100 z-10 items-center justify-center flex-row">
+                    <Text className="text-[32px] md:text-[36px] font-black font-serif tracking-tight text-[#1e1b4b] text-center">Vinir</Text>
+                </View>
 
             {renderTabsNav()}
 
@@ -613,6 +615,7 @@ export default function FriendsScreen() {
                 </View>
             )}
         </View>
+        </SafeAreaView>
     );
 }
 

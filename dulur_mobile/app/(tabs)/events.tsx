@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Animated as NativeAnimated, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+
 
 const { width } = Dimensions.get('window');
 
@@ -14,42 +15,64 @@ export default function EventsScreen() {
     const [activeEvent, setActiveEvent] = useState<any | null>(null);
     const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    
-    const fadeAnim = useState(new Animated.Value(0))[0];
-    const slideAnim = useState(new Animated.Value(30))[0];
+    const [xp, setXp] = useState(0);
+    const [xpBounce, setXpBounce] = useState(false);
+
+    const fadeAnim = useState(new NativeAnimated.Value(0))[0];
+    const slideAnim = useState(new NativeAnimated.Value(30))[0];
+
+    const xpScale = React.useRef(new NativeAnimated.Value(1)).current;
+
+    const xpStyle = {
+        transform: [{ scale: xpScale }]
+    };
 
     useEffect(() => {
-        const fetchEvents = async () => {
+        const loadData = async () => {
             const now = new Date().toISOString();
 
-            let { data: activeData } = await supabase
-                .from('special_events')
-                .select('*')
-                .eq('event_type', 'monthly')
-                .lte('start_date', now)
-                .gte('end_date', now)
-                .order('start_date', { ascending: false });
+            const sessionPromise = supabase.auth.getSession();
+            const eventsResPromise = supabase.from('special_events').select('*').eq('event_type', 'monthly').order('start_date', { ascending: true });
 
-            let { data: upcomingData } = await supabase
-                .from('special_events')
-                .select('*')
-                .eq('event_type', 'monthly')
-                .gt('start_date', now)
-                .order('start_date', { ascending: true });
+            const [{ data: { session } }, eventsRes] = await Promise.all([sessionPromise, eventsResPromise]);
+            const user = session?.user;
+
+            const profileRes = user ? await supabase.from('profiles').select('xp').eq('id', user.id).maybeSingle() : { data: null };
+
+            const allEvents = eventsRes.data || [];
+
+            const activeData = allEvents.filter(e => e.start_date <= now && e.end_date >= now);
+            const upcomingData = allEvents.filter(e => e.start_date > now);
 
             const activeEventMatched = activeData?.find(e => (e.modifiers?._locale || 'is') === 'is') || activeData?.[0] || null;
             const upcomingMatched = upcomingData?.filter(e => (e.modifiers?._locale || 'is') === 'is') || upcomingData || [];
 
             setActiveEvent(activeEventMatched);
             setUpcomingEvents(upcomingMatched);
+            if (profileRes.data && profileRes.data.xp) setXp(profileRes.data.xp);
             setLoading(false);
 
-            Animated.parallel([
-                Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-                Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true })
+            NativeAnimated.parallel([
+                NativeAnimated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+                NativeAnimated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true })
             ]).start();
         };
-        fetchEvents();
+
+        loadData();
+
+        // Listen for XP rewards specifically inside the tabs
+        const sub = DeviceEventEmitter.addListener('xp-earned', (amount: number) => {
+            setXp(prev => prev + amount);
+            setXpBounce(true);
+
+            NativeAnimated.sequence([
+                NativeAnimated.timing(xpScale, { toValue: 1.3, duration: 150, useNativeDriver: true }),
+                NativeAnimated.timing(xpScale, { toValue: 1, duration: 250, useNativeDriver: true })
+            ]).start();
+
+            setTimeout(() => setXpBounce(false), 800);
+        });
+        return () => sub.remove();
     }, []);
 
     const calculateProgress = (start: string, end: string) => {
@@ -62,12 +85,7 @@ export default function EventsScreen() {
         return progress;
     };
 
-    const handlePlayPress = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        if (activeEvent) {
-             router.push({ pathname: '/game/[id]', params: { id: activeEvent.id, isEvent: 'true' } as any });
-        }
-    };
+
 
     return (
         <SafeAreaView className="flex-1 bg-black" edges={['top']}>
@@ -75,8 +93,9 @@ export default function EventsScreen() {
                 colors={['#0F172A', '#020617', '#000000']}
                 className="absolute inset-0"
             />
-            
-            <View className="absolute top-0 w-full h-[60%] opacity-40 mix-blend-screen pointer-events-none">
+            {/* Render XP pill inside the scrollview header directly for exact alignment */}
+
+            <View className="absolute top-0 w-full h-[60%] opacity-40 mix-blend-screen" pointerEvents="none">
                 <LinearGradient
                     colors={['#4338ca', 'transparent']}
                     className="absolute inset-0"
@@ -86,9 +105,22 @@ export default function EventsScreen() {
             </View>
 
             <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-                <View className="px-6 pt-10 pb-6">
-                    <Text className="text-4xl font-black text-white tracking-[2px] uppercase mb-1">Viðburðir</Text>
-                    <Text className="text-indigo-200/60 font-bold tracking-wide">Einkareknar áskoranir. Meiri stig.</Text>
+                <View className="w-full relative px-6 pt-12 pb-6 flex-col">
+                    {xp > 0 && (
+                        <View className="absolute top-12 right-6 z-10" pointerEvents="none">
+                            <NativeAnimated.View style={[xpStyle]} className={`flex-row items-center gap-1.5 bg-[#EAB308] border ${xpBounce ? 'border-[#FDE047]' : 'border-[#CA8A04]'} px-3 py-1.5 rounded-[12px] shadow-sm`}>
+                                <Ionicons name="star" size={14} color="white" />
+                                <Text className="text-white font-black text-[13px]">{xp}</Text>
+                            </NativeAnimated.View>
+                        </View>
+                    )}
+                    <Text
+                        className="text-[44px] leading-[1.1] font-white font-serif tracking-tighter text-white text-center mb-1"
+                        style={{ textShadowColor: 'white', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
+                    >
+                        Viðburðir.
+                    </Text>
+                    <Text className="text-indigo-200/60 font-bold tracking-wide text-center">Tvöfalt erfiðari áskoranir. Tvöfalt fleiri stig.</Text>
                 </View>
 
                 {loading ? (
@@ -96,17 +128,16 @@ export default function EventsScreen() {
                         <ActivityIndicator size="large" color="#818cf8" />
                     </View>
                 ) : (
-                    <Animated.View 
-                        className="px-5 w-full max-w-[600px] self-center"
-                        style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+                    <View
+                        className="px-5 w-full max-w-[600px] self-center mt-5"
                     >
                         {activeEvent ? (
-                            <View className="rounded-[40px] overflow-hidden bg-slate-900 border border-white/10 shadow-2xl" style={{ shadowColor: '#6366f1', shadowOpacity: 0.3, shadowRadius: 30, shadowOffset: { width: 0, height: 20 }}}>
+                            <View className="rounded-[40px] overflow-hidden bg-slate-900 border border-white/10 shadow-2xl" style={{ shadowColor: '#6366f1', shadowOpacity: 0.3, shadowRadius: 30, shadowOffset: { width: 0, height: 20 } }}>
                                 <LinearGradient
                                     colors={['rgba(99, 102, 241, 0.25)', 'rgba(2, 6, 23, 0.95)']}
                                     className="absolute inset-0"
                                 />
-                                
+
                                 <View className="p-8">
                                     <View className="flex-row items-center justify-between mb-8">
                                         <View className="bg-indigo-500/20 p-3 rounded-2xl border border-indigo-400/30">
@@ -141,19 +172,21 @@ export default function EventsScreen() {
                                         </View>
                                     </View>
 
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         activeOpacity={0.8}
-                                        onPress={handlePlayPress}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                                            if (activeEvent && activeEvent.id) {
+                                                router.push(`/game/${activeEvent.id}?isEvent=true` as any);
+                                            }
+                                        }}
                                     >
-                                        <LinearGradient
-                                            colors={['#6366f1', '#4338ca']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                            className="w-full rounded-[24px] py-5 flex-row items-center justify-center border border-indigo-400/40 shadow-xl"
-                                        >
-                                            <Text className="text-white font-black uppercase tracking-[3px] text-[16px] drop-shadow-md">Spila Áskorun</Text>
-                                            <Ionicons name="play" size={18} color="white" style={{ marginLeft: 8 }} />
-                                        </LinearGradient>
+                                        <View className="w-full rounded-[20px] py-4 flex-row items-center justify-center bg-white shadow-xl shadow-black/20 mt-2">
+                                            <Text className="text-[#0F172A] font-black text-lg mr-2">Spila</Text>
+                                            <View className="bg-indigo-600 w-8 h-8 rounded-full items-center justify-center">
+                                                <Ionicons name="play" size={14} color="white" style={{ marginLeft: 2 }} />
+                                            </View>
+                                        </View>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -165,7 +198,7 @@ export default function EventsScreen() {
                                 <Text className="text-slate-400 font-bold text-lg text-center leading-7">Engar áskoranir{'\n'}í gangi í augnablikinu.</Text>
                             </View>
                         )}
-                        
+
                         {upcomingEvents.length > 0 && (
                             <View className="mt-14 px-2">
                                 <Text className="text-slate-500 font-black text-sm mb-6 uppercase tracking-[3px] pl-2">Næst Á Dagskrá</Text>
@@ -184,8 +217,8 @@ export default function EventsScreen() {
                                 ))}
                             </View>
                         )}
-                        
-                    </Animated.View>
+
+                    </View>
                 )}
             </ScrollView>
         </SafeAreaView>

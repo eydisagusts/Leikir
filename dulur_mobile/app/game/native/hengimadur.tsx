@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Pressable, ActivityIndicator, Dimensions, DeviceEventEmitter } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, useAnimatedProps, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 const { width } = Dimensions.get('window');
@@ -30,6 +31,46 @@ export default function NativeHengimadur() {
     const [gameState, setGameState] = useState<'playing' | 'won' | 'lost' | 'loading' | 'error'>('loading');
     const [mistakes, setMistakes] = useState(0);
 
+    const [earnedXp, setEarnedXp] = useState<number | null>(null);
+    const [showFlyXp, setShowFlyXp] = useState(false);
+    const [isFreshGameOver, setIsFreshGameOver] = useState(false);
+
+    const xpAnimY = useSharedValue(0);
+    const xpAnimOpacity = useSharedValue(1);
+
+    const handleCloseModal = () => {
+        setIsFreshGameOver(false);
+        if (earnedXp && earnedXp > 0) {
+            setShowFlyXp(true);
+            xpAnimY.value = 0;
+            xpAnimOpacity.value = 1;
+            xpAnimY.value = withTiming(-350, { duration: 1200 });
+            xpAnimOpacity.value = withTiming(0, { duration: 1200 });
+            setTimeout(() => {
+                setShowFlyXp(false);
+                DeviceEventEmitter.emit('xp-earned', earnedXp);
+            }, 1300);
+        }
+    };
+
+    const flyStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateY: xpAnimY.value }],
+            opacity: xpAnimOpacity.value,
+        };
+    });
+
+    const handleShare = async () => {
+        const header = `Dulur: Hengimaður 🤠`;
+        const xpText = earnedXp ? `\n⭐ XP: +${earnedXp}` : '';
+        const message = `${header}\n${xpText}\n\nÉg giskaði á rétt orð!\ndulur.is 🔥`;
+        try {
+            await Share.share({ message });
+        } catch (error) {
+            console.error('Error sharing', error);
+        }
+    };
+
     const MAX_MISTAKES = 6;
 
     const handleLevelChange = (newLevel: number) => {
@@ -42,20 +83,33 @@ export default function NativeHengimadur() {
 
     const initGame = async (l: number) => {
         try {
-            const res = await fetch(`${API_URL}/api/mobile/hengimadur/init?level=${l}`);
-            if (!res.ok) throw new Error('API down');
-            const data = await res.json();
+            const today = new Date().toISOString().split('T')[0];
+
+            const sessionPromise = supabase.auth.getSession();
+            const apiPromise = fetch(`${API_URL}/api/mobile/hengimadur/init?level=${l}`).then(res => res.json());
+
+            const { data: { session } } = await sessionPromise;
+            const user = session?.user;
+
+            const dbPromises = user ? Promise.all([
+                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).maybeSingle(),
+                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+            ]) : Promise.resolve([{ data: null }, { data: null }]);
+
+            const [data, [stateDataRes, resDataRes]] = await Promise.all([
+                apiPromise,
+                dbPromises
+            ]);
             
             setTargetWord(data.targetWord);
             
-            const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 setGameState('playing'); 
                 return; 
             }
 
-            const today = new Date().toISOString().split('T')[0];
-            const { data: stateData } = await supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).single();
+            const stateData = stateDataRes.data;
+            const resData = resDataRes.data;
             
             let loadedGuesses: string[] = [];
             let loadedMistakes = 0;
@@ -65,8 +119,6 @@ export default function NativeHengimadur() {
                 loadedMistakes = stateData.state_json.mistakes || 0;
             }
 
-            const { data: resData } = await supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).gte('played_at', `${today}T00:00:00Z`).single();
-            
             if (resData) {
                 setGameState(resData.won ? 'won' : 'lost');
                 setGuessedLetters(loadedGuesses.length > 0 ? loadedGuesses : Array.from(new Set(data.targetWord.split(''))));
@@ -147,6 +199,9 @@ export default function NativeHengimadur() {
             const correctCount = Array.from(new Set(targetWord.split(''))).filter(c => guessedLetters.includes(c)).length;
             xpReward = correctCount * 5;
         }
+
+        setEarnedXp(xpReward);
+        setTimeout(() => setIsFreshGameOver(true), 1000);
 
         await supabase.from('game_results').insert({
             time_taken_seconds: 60,
@@ -239,16 +294,25 @@ export default function NativeHengimadur() {
             </View>
 
             {/* Status Messages */}
-            {gameState !== 'playing' && (
-                <View className="absolute top-[40%] self-center bg-white px-8 py-6 rounded-2xl shadow-xl items-center z-50 w-[80%] border border-[#D3D6DA]">
-                    <Text className="text-2xl font-bold font-serif text-foreground">{gameState === 'won' ? 'Lifaði Af!' : 'Því miður!'}</Text>
-                    <Text className="mt-2 text-base text-muted-foreground mb-4">
-                        {gameState === 'won' ? 'Þú giskaðir á rétt orð.' : 'Þú hengtist.'}
-                    </Text>
-                    <TouchableOpacity onPress={() => router.back()} className="bg-foreground px-8 py-3.5 rounded-full shadow-md w-full items-center">
-                        <Text className="text-background font-bold text-lg">Til baka</Text>
-                    </TouchableOpacity>
-                </View>
+            <NativeGameEndModal
+                gameTitle="Hengimann"
+                visible={(gameState === 'won' || gameState === 'lost') && isFreshGameOver}
+                gameState={gameState as 'won' | 'lost'}
+                xpEarned={earnedXp}
+                winTitle="Lifaði Af!"
+                winDesc={`Orðið var: ${targetWord}`}
+                loseTitle="Því miður!"
+                loseDesc={`Orðið var: ${targetWord}`}
+                onContinue={handleCloseModal}
+            />
+
+            {showFlyXp && earnedXp !== null && earnedXp > 0 && (
+                <Animated.View style={[{ position: 'absolute', top: '40%', alignSelf: 'center', zIndex: 60, pointerEvents: 'none' }, flyStyle]}>
+                    <View className="bg-[#EAB308] flex-row items-center gap-1.5 px-4 py-2 rounded-full shadow-lg border border-[#FDE047]">
+                        <Ionicons name="star" size={16} color="white" />
+                        <Text className="text-white font-black text-xl tracking-widest">+{earnedXp}</Text>
+                    </View>
+                </Animated.View>
             )}
 
             {/* Native Keyboard */}
