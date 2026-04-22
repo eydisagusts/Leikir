@@ -6,6 +6,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import { FontAwesome5 } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { Platform } from 'react-native';
 
 // Essential for iOS/Android WebView return resolution
 WebBrowser.maybeCompleteAuthSession();
@@ -76,6 +78,37 @@ export default function LoginScreen() {
         }
     };
 
+    const handleAppleLogin = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+            });
+            
+            if (credential.identityToken) {
+                const { error } = await supabase.auth.signInWithIdToken({
+                    provider: 'apple',
+                    token: credential.identityToken,
+                });
+                if (error) throw error;
+            } else {
+                throw new Error('Skráning mistókst, ekkert auðkenni barst frá Apple.');
+            }
+        } catch (e: any) {
+            if (e.code === 'ERR_REQUEST_CANCELED') {
+                // User closed the Apple login modal early
+            } else {
+                setError(e.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <View className="flex-1 justify-center px-8 bg-background">
             <Text className="text-4xl font-serif font-black mb-8 text-foreground text-center">Dulur.</Text>
@@ -111,6 +144,16 @@ export default function LoginScreen() {
                 <Text className="text-slate-500 font-sans font-semibold px-4 text-sm">eða skrá inn með</Text>
                 <View className="flex-1 h-[1px] bg-slate-200" />
             </View>
+
+            {Platform.OS === 'ios' && (
+                <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                    cornerRadius={12}
+                    style={{ width: '100%', height: 56, marginBottom: 16 }}
+                    onPress={handleAppleLogin}
+                />
+            )}
 
             <View className="flex-row items-center justify-between w-full gap-4">
                 <TouchableOpacity 

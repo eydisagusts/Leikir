@@ -291,14 +291,14 @@ export default function NativeStraumur() {
         // Check if it matches Spangram
         const isSpangram = currentWord === game.spangram.word || currentWord === game.spangram.word.split('').reverse().join('');
         if (isSpangram && !foundWords.includes(game.spangram.word)) {
-            successFound(game.spangram.word, true);
+            successFound(game.spangram.word, true, game.spangram.coords);
             return;
         }
         
         // Check if it matches a theme word
         const matchedTheme = game.themeWords.find(t => t.word === currentWord || t.word === currentWord.split('').reverse().join(''));
         if (matchedTheme && !foundWords.includes(matchedTheme.word)) {
-            successFound(matchedTheme.word, false);
+            successFound(matchedTheme.word, false, matchedTheme.coords);
             return;
         }
 
@@ -331,17 +331,18 @@ export default function NativeStraumur() {
         }
     };
 
-    const successFound = async (word: string, isSpangram: boolean) => {
+    const successFound = async (word: string, isSpangram: boolean, correctCoords: Coordinate[]) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         const newFoundWords = [...foundWords, word];
-        const newFoundPaths = [...foundPaths, [...activePath]];
+        // Enforce strict mapping to backend constraints to eliminate ambiguous identical-letter soft-locks
+        const newFoundPaths = [...foundPaths, [...correctCoords]];
         
         setFoundWords(newFoundWords);
         setFoundPaths(newFoundPaths);
         setActivePath([]);
         
-        setHintedCoords(prev => prev.filter(hc => !activePath.some(ac => ac.r === hc.r && ac.c === hc.c)));
+        setHintedCoords(prev => prev.filter(hc => !correctCoords.some(ac => ac.r === hc.r && ac.c === hc.c)));
         
         syncGameState(newFoundWords, newFoundPaths);
 
