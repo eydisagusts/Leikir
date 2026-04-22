@@ -164,9 +164,11 @@ export default function NativeHengimadur() {
 
         if (isWon) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            DeviceEventEmitter.emit('stop-timer');
             setGameState('won');
             await syncTrueResult(true, newMistakes);
         } else if (isLost) {
+            DeviceEventEmitter.emit('stop-timer');
             setGameState('lost');
             await syncTrueResult(false, newMistakes);
         } else {

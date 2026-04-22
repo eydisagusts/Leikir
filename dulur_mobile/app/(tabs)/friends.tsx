@@ -503,19 +503,21 @@ export default function FriendsScreen() {
                     <Text className="text-[32px] md:text-[36px] font-black font-serif tracking-tight text-[#1e1b4b] text-center">Vinir</Text>
                 </View>
 
-            {renderTabsNav()}
+            <View className="flex-1 w-full max-w-[600px] self-center">
+                {renderTabsNav()}
 
-            <ScrollView className="flex-1 mt-2" showsVerticalScrollIndicator={false}>
-                 {isLoading && !searchQuery ? (
-                     <View className="mt-20"><ActivityIndicator size="large" color="#1e1b4b" /></View>
-                 ) : (
-                     <View>
-                         {activeTab === 'vinir' && renderVinir()}
-                         {activeTab === 'leita' && renderLeita()}
-                         {activeTab === 'askoranir' && renderAskoranir()}
-                     </View>
-                 )}
-            </ScrollView>
+                <ScrollView className="flex-1 mt-2" showsVerticalScrollIndicator={false}>
+                    {isLoading && !searchQuery ? (
+                        <View className="mt-20"><ActivityIndicator size="large" color="#1e1b4b" /></View>
+                    ) : (
+                        <View>
+                            {activeTab === 'vinir' && renderVinir()}
+                            {activeTab === 'leita' && renderLeita()}
+                            {activeTab === 'askoranir' && renderAskoranir()}
+                        </View>
+                    )}
+                </ScrollView>
+            </View>
 
             {/* Challenge Modal */}
             {challengeModalOpen && (

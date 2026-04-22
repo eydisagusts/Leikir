@@ -76,8 +76,13 @@ export const NativeGameEndModal: React.FC<NativeGameEndModalProps> = ({
                                     <Ionicons name="star" size={36} color="#10b981" />
                                 </View>
                             </View>
-                            <Text className="text-[32px] font-black font-serif mb-2 text-[#0f172a] text-center tracking-tight">{winTitle}</Text>
-                            <Text className="text-[#64748b] text-center mb-8 text-[15px] leading-relaxed font-medium">{winDesc}</Text>
+                            <Text 
+                                className="text-[32px] font-black font-serif mb-2 text-[#0f172a] text-center tracking-tight"
+                                style={{ textShadowColor: '#0f172a', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
+                            >
+                                Vel gert!
+                            </Text>
+                            <Text className="text-[#64748b] text-center mb-8 text-[15px] leading-relaxed font-bold">{winDesc}</Text>
                         </>
                     ) : (
                         <>
@@ -87,8 +92,13 @@ export const NativeGameEndModal: React.FC<NativeGameEndModalProps> = ({
                                     <Text className="text-[36px] text-center leading-[36px]">💥</Text>
                                 </View>
                             </View>
-                            <Text className="text-[32px] font-black font-serif mb-2 text-[#ef4444] text-center tracking-tight">{loseTitle}</Text>
-                            <Text className="text-[#ef4444] text-center mb-8 text-[15px] opacity-90 font-medium">{loseDesc}</Text>
+                            <Text 
+                                className="text-[32px] font-black font-serif mb-2 text-[#ef4444] text-center tracking-tight"
+                                style={{ textShadowColor: '#ef4444', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
+                            >
+                                Kemur betur næst!
+                            </Text>
+                            <Text className="text-[#ef4444] text-center mb-8 text-[15px] opacity-90 font-bold">{loseDesc}</Text>
                         </>
                     )}
 

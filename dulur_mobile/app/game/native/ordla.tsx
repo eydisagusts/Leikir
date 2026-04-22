@@ -200,7 +200,8 @@ export default function NativeOrdla() {
                 return;
             }
 
-            if (!dictionary.has(currentGuess)) {
+            // Urgent bypass: The actual answer must ALWAYS be accepted as a valid word, even if server dictionaries are out of sync.
+            if (currentGuess !== targetWord && !dictionary.has(currentGuess)) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                 showToast("Orð ekki í orðabók");
                 return;

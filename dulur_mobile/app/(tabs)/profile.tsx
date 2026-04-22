@@ -218,7 +218,7 @@ export default function ProfileScreen() {
                 </View>
             </View>
 
-            <ScrollView className="flex-1 px-4 mt-6" contentContainerStyle={{ paddingBottom: 150 }}>
+            <ScrollView className="flex-1 px-4 mt-6" contentContainerStyle={{ paddingBottom: 150, alignSelf: 'center', width: '100%', maxWidth: 600 }}>
                 {/* Account Details */}
                 <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Aðgangur</Text>
                 <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>

@@ -257,11 +257,14 @@ const GameCard = React.memo(({
     onPress: (id: string) => void
 }) => {
     const showBadge = game.badge && !isSubscribed;
+    const cardWidth = width >= 768 ? '31%' : '48%';
+    
     return (
         <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => onPress(game.id)}
-            className="w-[48%] mb-8"
+            className="mb-8"
+            style={{ width: cardWidth }}
         >
             <View
                 className="w-full aspect-[4/3] bg-white rounded-3xl border border-black/5 shadow-sm mb-3.5 overflow-hidden justify-center items-center"
@@ -322,9 +325,9 @@ export default function HomeHubScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1 bg-[#FAFAFA]" contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-
-                {/* Header & Motto (Centered 2026 Home Page Style) */}
+            <ScrollView className="flex-1 bg-[#FAFAFA]" contentContainerStyle={{ paddingBottom: 120, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+                <View className="w-full max-w-[600px]">
+                    {/* Header & Motto (Centered 2026 Home Page Style) */}
                 <View className="w-full relative px-6 pt-12 pb-10 flex-col items-center justify-center">
                     {/* XP absolutely positioned but matching the visual line of the title */}
                     <View className="absolute top-16 right-6 z-10">
@@ -361,8 +364,12 @@ export default function HomeHubScreen() {
                             onPress={handleGamePress}
                         />
                     ))}
+                    {Array.from({ length: width >= 768 ? (3 - (GAMES.length % 3)) % 3 : (2 - (GAMES.length % 2)) % 2 }).map((_, i) => (
+                        <View key={`dummy-${i}`} style={{ width: width >= 768 ? '31%' : '48%' }} className="pointer-events-none" />
+                    ))}
                 </View>
 
+                </View>
             </ScrollView>
         </SafeAreaView>
     );

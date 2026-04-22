@@ -1,8 +1,11 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme, Platform, View } from 'react-native';
+import { useColorScheme, Platform, View, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
+
+const { width } = Dimensions.get('window');
+const isPad = width >= 768;
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -14,20 +17,22 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#a8a29e',
         tabBarStyle: {
            position: 'absolute',
-           bottom: 0,
-           left: 0,
-           right: 0,
-           height: Platform.OS === 'ios' ? 90 : 70,
+           bottom: isPad ? 24 : 0,
+           left: isPad ? Math.floor((width - 600) / 2) : 0,
+           right: isPad ? 'auto' : 0,
+           width: isPad ? 600 : '100%',
+           height: Platform.OS === 'ios' && !isPad ? 90 : 70,
            backgroundColor: 'rgba(255, 255, 255, 0.75)',
            borderTopWidth: 0,
+           borderRadius: isPad ? 35 : 0,
            elevation: 10,
            shadowColor: '#000',
-           shadowOffset: { width: 0, height: -3 },
-           shadowOpacity: 0.05,
-           shadowRadius: 10,
+           shadowOffset: { width: 0, height: 4 },
+           shadowOpacity: 0.1,
+           shadowRadius: 15,
         },
         tabBarBackground: () => (
-           <BlurView intensity={80} style={{ flex: 1 }} tint="light" />
+           <BlurView intensity={80} style={{ flex: 1, borderRadius: isPad ? 35 : 0, overflow: 'hidden' }} tint="light" />
         ),
         tabBarItemStyle: {
             paddingVertical: 10,

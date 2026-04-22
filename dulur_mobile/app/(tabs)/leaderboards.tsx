@@ -140,6 +140,7 @@ export default function LeaderboardsScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top']}>
+            <View className="flex-1 w-full max-w-[600px] self-center">
             <View className="px-6 pt-12 pb-6 items-center justify-center">
                 <Text
                     className="text-[44px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center mb-1"
@@ -205,6 +206,7 @@ export default function LeaderboardsScreen() {
                     {renderPlayerRow({ id: currentUserId, username: currentUserStats.username, xp: currentUserStats.xp }, 0, true, currentUserStats.rank)}
                 </View>
             )}
+            </View>
         </SafeAreaView>
     );
 }
