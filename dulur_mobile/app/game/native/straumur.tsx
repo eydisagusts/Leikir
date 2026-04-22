@@ -136,8 +136,6 @@ export default function NativeStraumur() {
                 } else {
                     if (stateData) {
                         const words = stateData.state_json.foundWords || [];
-                        
-                        // AUTO-HEAL: Reconstruct strict valid paths from strings to fix any legacy bad states
                         const healedPaths = words.map((w: string) => {
                             if (w === data.spangram.word) return data.spangram.coords;
                             const t = data.themeWords.find((tw: any) => tw.word === w);
@@ -260,7 +258,6 @@ export default function NativeStraumur() {
                     return [...prev, { r, c }];
                 }
             } else {
-                // FAST SWIPE INTERPOLATION (Frame skipping patch)
                 if (rDiff === 0 || cDiff === 0 || rDiff === cDiff) {
                     const steps = Math.max(rDiff, cDiff);
                     const stepR = rDiff === 0 ? 0 : (r - lastNode.r) / rDiff;
@@ -294,17 +291,14 @@ export default function NativeStraumur() {
     const validatePath = async () => {
         if (!game || activePath.length === 0) return;
         
-        // Construct the word
         const currentWord = activePath.map(coord => game.grid[coord.r][coord.c]).join('');
         
-        // Check if it matches Spangram
         const isSpangram = currentWord === game.spangram.word || currentWord === game.spangram.word.split('').reverse().join('');
         if (isSpangram && !foundWords.includes(game.spangram.word)) {
             successFound(game.spangram.word, true, game.spangram.coords);
             return;
         }
         
-        // Check if it matches a theme word
         const matchedTheme = game.themeWords.find(t => t.word === currentWord || t.word === currentWord.split('').reverse().join(''));
         if (matchedTheme && !foundWords.includes(matchedTheme.word)) {
             successFound(matchedTheme.word, false, matchedTheme.coords);
@@ -344,7 +338,6 @@ export default function NativeStraumur() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         const newFoundWords = [...foundWords, word];
-        // Enforce strict mapping to backend constraints to eliminate ambiguous identical-letter soft-locks
         const newFoundPaths = [...foundPaths, [...correctCoords]];
         
         setFoundWords(newFoundWords);
@@ -456,7 +449,7 @@ export default function NativeStraumur() {
                 gameState="won"
                 xpEarned={earnedXp}
                 winTitle="Vel gert!"
-                winDesc="Þú fannst öll þemaorðin ásamt Spangraminu!"
+                winDesc="Þú fannst öll orðin!"
                 onContinue={handleCloseModal}
             />
 
@@ -604,7 +597,7 @@ export default function NativeStraumur() {
                 })}
                 <View className={`px-6 py-2.5 rounded-full border-[2px] w-[90%] max-w-[280px] items-center mt-2 ${foundWords.includes(game.spangram.word) ? 'bg-yellow-100 border-yellow-400 shadow-sm' : 'bg-transparent border-dashed border-gray-300'}`}>
                     <Text className={`text-sm font-black tracking-widest uppercase ${foundWords.includes(game.spangram.word) ? 'text-yellow-900' : 'text-gray-400'}`}>
-                        {foundWords.includes(game.spangram.word) ? game.spangram.word : "S P A N G R A M"}
+                        {foundWords.includes(game.spangram.word) ? game.spangram.word : "•".repeat(game.spangram.word.length).split('').join(' ')}
                     </Text>
                 </View>
             </View>
