@@ -135,8 +135,17 @@ export default function NativeStraumur() {
                     setFoundPaths([...data.themeWords.map(t => t.coords), data.spangram.coords]);
                 } else {
                     if (stateData) {
-                        setFoundWords(stateData.state_json.foundWords || []);
-                        setFoundPaths(stateData.state_json.foundPaths || []);
+                        const words = stateData.state_json.foundWords || [];
+                        
+                        // AUTO-HEAL: Reconstruct strict valid paths from strings to fix any legacy bad states
+                        const healedPaths = words.map((w: string) => {
+                            if (w === data.spangram.word) return data.spangram.coords;
+                            const t = data.themeWords.find((tw: any) => tw.word === w);
+                            return t ? t.coords : [];
+                        }).filter((p: Coordinate[]) => p.length > 0);
+
+                        setFoundWords(words);
+                        setFoundPaths(healedPaths);
                     }
                     setGameState('playing');
                 }
