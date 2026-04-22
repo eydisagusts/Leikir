@@ -57,6 +57,7 @@ export default function ProfileScreen() {
         if (!session?.user) return;
 
         await supabase.from('profiles').update({ username }).eq('id', session.user.id);
+        DeviceEventEmitter.emit('profile-updated');
         Alert.alert('Vistað', 'Notandanafn hefur verið uppfært.');
     };
 

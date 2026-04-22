@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -72,7 +72,10 @@ export default function LeaderboardsScreen() {
                 setLoading(false);
             }
         }
+        
         fetchLeaderboard();
+        const profileSub = DeviceEventEmitter.addListener('profile-updated', fetchLeaderboard);
+        return () => profileSub.remove();
     }, []);
 
     const currentList = viewMode === 'global' ? players : friends;

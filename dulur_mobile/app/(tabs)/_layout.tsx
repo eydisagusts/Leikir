@@ -1,14 +1,13 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme, Platform, View, Dimensions } from 'react-native';
+import { useColorScheme, Platform, View, Dimensions, useWindowDimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
-
-const { width } = Dimensions.get('window');
-const isPad = width >= 768;
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { width } = useWindowDimensions();
+  const isPad = width >= 768;
   
   return (
     <Tabs
@@ -18,9 +17,7 @@ export default function TabLayout() {
         tabBarStyle: {
            position: 'absolute',
            bottom: isPad ? 24 : 0,
-           left: isPad ? Math.floor((width - 600) / 2) : 0,
-           right: isPad ? 'auto' : 0,
-           width: isPad ? 600 : '100%',
+           marginHorizontal: isPad ? (width - 600) / 2 : 0,
            height: Platform.OS === 'ios' && !isPad ? 90 : 70,
            backgroundColor: 'rgba(255, 255, 255, 0.75)',
            borderTopWidth: 0,

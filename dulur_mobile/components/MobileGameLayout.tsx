@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Modal, ScrollView, Animated as NativeAnimated } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, Modal, ScrollView, Animated as NativeAnimated, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -26,6 +26,8 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
     const [timerKey, setTimerKey] = useState<string | null>(null);
     const [totalXp, setTotalXp] = useState<number>(0);
     const [xpBounce, setXpBounce] = useState(false);
+    const { width } = useWindowDimensions();
+    const isPad = width >= 768;
 
     const xpScale = React.useRef(new Animated.Value(1)).current;
 
@@ -197,7 +199,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 </View>
 
                 {/* Header */}
-                <View className="flex-row items-center justify-between px-4 mt-6 pt-4 pb-2 w-full self-center max-w-[500px] z-10">
+                <View className={`flex-row items-center justify-between px-4 pt-4 pb-2 w-full self-center max-w-[500px] z-10 ${isPad ? 'mt-16' : 'mt-6'}`}>
                     <View className="flex-1 items-start">
                         <TouchableOpacity onPress={onBack} activeOpacity={0.7} className="flex-row items-center bg-white border border-slate-200/60 px-3.5 py-2 rounded-[16px] shadow-sm">
                             <Ionicons name="chevron-back" size={18} color="#64748b" />

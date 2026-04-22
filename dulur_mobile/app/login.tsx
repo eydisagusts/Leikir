@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import { FontAwesome5 } from '@expo/vector-icons';
 
 // Essential for iOS/Android WebView return resolution
@@ -14,7 +15,12 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMsg, setError] = useState<string|null>(null);
+    const [debugUrl, setDebugUrl] = useState<string>('');
     const router = useRouter();
+
+    React.useEffect(() => {
+        setDebugUrl(Linking.createURL('auth'));
+    }, []);
 
     const handleLogin = async () => {
         setLoading(true);
@@ -29,17 +35,18 @@ export default function LoginScreen() {
         setError(null);
         
         try {
-            // Generates dulur://auth internally to properly match Supabase dashboard redirects
-            const redirectUrl = makeRedirectUri({
-                scheme: 'dulur',
-                path: 'auth'
-            });
+            // Force the router link path natively 
+            const redirectUrl = Linking.createURL('auth');
+            
+            // NOTE TO DEV: This is the EXACT URL that must be added to Supabase. 
+            // Often "exp://*" fails to catch inner slashes.
+            console.log("Supabase Auth Redirect URL generated: ", redirectUrl);
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: provider,
                 options: {
                     redirectTo: redirectUrl,
-                    skipBrowserRedirect: true, // We must launch the web browser manually
+                    skipBrowserRedirect: true,
                 },
             });
 
@@ -47,15 +54,18 @@ export default function LoginScreen() {
 
             if (data?.url) {
                 const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+                
                 if (res.type === 'success' && res.url) {
-                    // Extract session hashes explicitly
                     const rawUrl = res.url.replace('#', '?');
-                    const urlObj = new URL(rawUrl);
-                    const access_token = urlObj.searchParams.get('access_token');
-                    const refresh_token = urlObj.searchParams.get('refresh_token');
+                    const accessTokenMatch = rawUrl.match(/access_token=([^&]+)/);
+                    const refreshTokenMatch = rawUrl.match(/refresh_token=([^&]+)/);
                     
-                    if (access_token && refresh_token) {
-                        await supabase.auth.setSession({ access_token, refresh_token });
+                    if (accessTokenMatch && refreshTokenMatch) {
+                        const { error: sessionErr } = await supabase.auth.setSession({ 
+                            access_token: accessTokenMatch[1], 
+                            refresh_token: refreshTokenMatch[1] 
+                        });
+                        if (sessionErr) throw sessionErr;
                     }
                 }
             }
