@@ -295,7 +295,9 @@ export default function NativeMyndagata() {
 
     return (
         <MobileGameLayout 
-            title="Myndagáta" 
+            gameId="myndagata"
+            gameTitle="Myndagáta" 
+            isGameOver={gameState !== 'playing'}
             onBack={() => router.replace('/(tabs)')}
         >
             <ScrollView className="flex-1" contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>

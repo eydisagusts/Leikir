@@ -257,7 +257,9 @@ export default function NativeSamhengi() {
 
     return (
         <MobileGameLayout 
-            title="Samhengi" 
+            gameId="samhengi"
+            gameTitle="Samhengi" 
+            isGameOver={gameState !== 'playing'}
             onBack={() => router.replace('/(tabs)')}
         >
             <View className="flex-1 px-4 mt-2">
