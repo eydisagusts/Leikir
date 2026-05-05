@@ -5,18 +5,21 @@ import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import Svg, { Path, Circle, Polyline } from 'react-native-svg';
+import { GataWidget } from '@/components/GataWidget';
 
 const { width } = Dimensions.get('window');
 
 const GAMES = [
     { id: 'ordla', name: 'Orðla', desc: 'Finndu orð dagsins í minna en sex tilraunum.', iconType: 'ordla', badge: null },
-    { id: 'krossgata', name: 'Krossgáta', desc: 'Klassísk krossgáta', iconType: 'krossgata', badge: 'ÁSKRIFT' },
-    { id: 'stafarugl', name: 'Stafarugl', desc: 'Finndu orðin í stafaruglinu.', iconType: 'stafarugl', badge: 'ÁSKRIFT' },
-    { id: 'tengingar', name: 'Tengingar', desc: 'Finndu fjóra flokka með fjórum orðum sem tengjast.', iconType: 'tengingar', badge: 'ÁSKRIFT' },
     { id: 'hengimadur', name: 'Hengimaður', desc: 'Bjargaðu karlinum úr snörunni með því að giska á stafina í orðinu.', iconType: 'hengimadur', badge: null },
     { id: 'sudoku', name: 'Sudoku', desc: 'Settu tölustafina í réttan reit.', iconType: 'sudoku', badge: null },
+    { id: 'samhengi', name: 'Samhengi', desc: 'Finndu leyniorðið með því að giska á orð sem tengjast því í samhengi.', iconType: 'samhengi', badge: 'ÁSKRIFT' },
+    { id: 'tengingar', name: 'Tengingar', desc: 'Finndu fjóra flokka með fjórum orðum sem tengjast.', iconType: 'tengingar', badge: 'ÁSKRIFT' },
+    { id: 'myndagata', name: 'Myndagáta', desc: 'Teiknaðu myndina með því að fylla út í reitina samkvæmt tölunum.', iconType: 'myndagata', badge: 'ÁSKRIFT' },
     { id: 'straumur', name: 'Straumur', desc: 'Dragðu yfir stafina til að finna orðin. Líkt stafarugli en hver stafur tilheyrir orði.', iconType: 'straumur', badge: 'ÁSKRIFT' },
     { id: 'sprengjuleit', name: 'Sprengjuleit', desc: 'Finndu földu sprengjurnar.', iconType: 'sprengjuleit', badge: 'ÁSKRIFT' },
+    { id: 'krossgata', name: 'Krossgáta', desc: 'Klassísk krossgáta', iconType: 'krossgata', badge: 'ÁSKRIFT' },
+    { id: 'stafarugl', name: 'Stafarugl', desc: 'Finndu orðin í stafaruglinu.', iconType: 'stafarugl', badge: 'ÁSKRIFT' },
     { id: 'kviss', name: 'Kviss', desc: 'Svaraðu fimm spennandi spurningum dagsins.', iconType: 'kviss', badge: 'ÁSKRIFT' },
     { id: 'litakodi', name: 'Litakóði', desc: 'Reyndu að finna réttan litakóða í 6 eða færri tilraunum.', iconType: 'litakodi', badge: 'ÁSKRIFT' },
     { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null }
@@ -78,6 +81,64 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
                             <Text style={{ fontFamily: 'serif', fontWeight: 'bold', fontSize: 13, color: highs.includes(i) ? '#1A2B4C' : '#A0A0A0' }}>{l}</Text>
                         </View>
                     ))}
+                </View>
+            </View>
+        );
+    }
+
+    if (type === 'samhengi') {
+        return (
+            <View className="absolute inset-0 bg-[#FAFAFA] flex-col items-center justify-center p-4">
+                <View className="w-full max-w-[80%] h-6 bg-white border-2 border-[#1E8E3E]/20 rounded-full flex-row items-center px-3 mb-2">
+                    <View className="w-4 h-4 rounded-full bg-[#1E8E3E]/40" />
+                </View>
+                <View className="w-full max-w-[80%] h-4 bg-green-500/20 rounded-sm overflow-hidden flex-row mb-2">
+                    <View className="w-[90%] bg-green-500 h-full" />
+                </View>
+                <View className="w-full max-w-[80%] h-4 bg-yellow-500/20 rounded-sm overflow-hidden flex-row mb-2">
+                    <View className="w-[40%] bg-yellow-500 h-full" />
+                </View>
+                <View className="w-full max-w-[80%] h-4 bg-red-500/20 rounded-sm overflow-hidden flex-row">
+                    <View className="w-[15%] bg-red-500 h-full" />
+                </View>
+            </View>
+        );
+    }
+
+    if (type === 'myndagata') {
+        return (
+            <View className="absolute inset-0 bg-[#F3F4F6] items-center justify-center p-4 overflow-hidden">
+                <View className="w-[75%] aspect-square max-w-[140px] flex-row" style={{ transform: [{ translateX: -12 }, { translateY: -12 }] }}>
+                    {/* Left Numbers */}
+                    <View className="w-[25%] flex-col pr-1.5">
+                        <View className="h-[25%]" />
+                        <View className="h-[75%] flex-col">
+                            <View className="flex-1 items-end justify-center"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>3</Text></View>
+                            <View className="flex-1 items-end justify-center flex-row gap-[1px]"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>1</Text><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>1</Text></View>
+                            <View className="flex-1 items-end justify-center"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>4</Text></View>
+                            <View className="flex-1 items-end justify-center"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>2</Text></View>
+                        </View>
+                    </View>
+                    <View className="w-[75%] flex-col">
+                        {/* Top Numbers */}
+                        <View className="h-[25%] flex-row items-end pl-1 pb-1">
+                            <View className="w-1/4 items-center flex-col"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>3</Text></View>
+                            <View className="w-1/4 items-center flex-col"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>1</Text><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>2</Text></View>
+                            <View className="w-1/4 items-center flex-col"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>1</Text><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>2</Text></View>
+                            <View className="w-1/4 items-center flex-col"><Text style={{ fontSize: 7, fontWeight: 'bold', color: '#4B5563' }}>2</Text></View>
+                        </View>
+                        {/* Grid */}
+                        <View className="h-[75%] flex-row flex-wrap bg-white border-2 border-gray-800">
+                            {/* Row 1 */}
+                            <View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 border-[0.5px] border-gray-300" />
+                            {/* Row 2 */}
+                            <View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 border-[0.5px] border-gray-300 items-center justify-center"><Text style={{ fontSize: 6, color: '#D1D5DB', fontWeight: 'bold' }}>X</Text></View><View className="w-1/4 h-1/4 border-[0.5px] border-gray-300 items-center justify-center"><Text style={{ fontSize: 6, color: '#D1D5DB', fontWeight: 'bold' }}>X</Text></View><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" />
+                            {/* Row 3 */}
+                            <View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" />
+                            {/* Row 4 */}
+                            <View className="w-1/4 h-1/4 border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 bg-[#2D4A3E] border-[0.5px] border-gray-300" /><View className="w-1/4 h-1/4 border-[0.5px] border-gray-300" />
+                        </View>
+                    </View>
                 </View>
             </View>
         );
@@ -316,7 +377,7 @@ export default function HomeHubScreen() {
     }, []);
 
     const handleGamePress = React.useCallback((id: string) => {
-        if (['ordla', 'stafarugl', 'tengingar', 'hengimadur', 'krossgata', 'sudoku', 'straumur', 'sprengjuleit', 'kviss', 'litakodi', 'minnisspil'].includes(id)) {
+        if (['ordla', 'stafarugl', 'tengingar', 'hengimadur', 'krossgata', 'sudoku', 'straumur', 'sprengjuleit', 'kviss', 'litakodi', 'minnisspil', 'myndagata', 'samhengi'].includes(id)) {
             router.push(`/game/native/${id}` as any);
         } else {
             router.push(`/game/${id}` as any);
@@ -340,12 +401,16 @@ export default function HomeHubScreen() {
                     </View>
 
                     <Text
-                        className="text-[52px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center mb-1"
+                        className="text-[52px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center mb-2"
                         style={{ textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
                     >
                         Dulur.
                     </Text>
-                    <Text className="text-[24px] font-bold font-serif italic text-slate-800 tracking-wide text-center">Mundu að leika.</Text>
+                    
+                    <View className="flex-row items-center justify-center gap-4 flex-wrap w-full">
+                        <Text className="text-[22px] font-bold font-serif italic text-slate-800 tracking-wide text-center">Mundu að leika.</Text>
+                        <GataWidget />
+                    </View>
                 </View>
 
                 {/* Allir Leikir Divider */}

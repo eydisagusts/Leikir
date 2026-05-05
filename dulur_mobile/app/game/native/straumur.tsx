@@ -258,6 +258,7 @@ export default function NativeStraumur() {
                     return [...prev, { r, c }];
                 }
             } else {
+                // FAST SWIPE INTERPOLATION (Frame skipping patch)
                 if (rDiff === 0 || cDiff === 0 || rDiff === cDiff) {
                     const steps = Math.max(rDiff, cDiff);
                     const stepR = rDiff === 0 ? 0 : (r - lastNode.r) / rDiff;

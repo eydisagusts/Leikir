@@ -174,6 +174,13 @@ export default function LoginScreen() {
                    <Text className="text-slate-700 font-bold ml-2 text-[15px]">Facebook</Text>
                 </TouchableOpacity>
             </View>
+
+            <View className="mt-8 flex-row justify-center items-center">
+                <Text className="text-slate-500 font-sans text-[15px]">Ertu ekki með aðgang? </Text>
+                <TouchableOpacity onPress={() => router.push('/signup')}>
+                    <Text className="text-[#1e1b4b] font-bold font-sans text-[15px] underline">Nýskráning</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }
