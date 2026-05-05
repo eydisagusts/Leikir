@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, Dimensions, PanResponder, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -294,12 +294,14 @@ export default function NativeMyndagata() {
     const cellBorder = 0.5;
 
     return (
-        <MobileGameLayout 
-            gameId="myndagata"
-            gameTitle="Myndagáta" 
-            isGameOver={gameState !== 'playing'}
-            onBack={() => router.replace('/(tabs)')}
-        >
+        <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
+            <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+            <MobileGameLayout 
+                gameId="myndagata"
+                gameTitle="Myndagáta" 
+                isGameOver={gameState !== 'playing'}
+                onBack={() => router.replace('/(tabs)')}
+            >
             <ScrollView className="flex-1" contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>
                 
                 <View className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 w-[95%]">
@@ -441,6 +443,7 @@ export default function NativeMyndagata() {
                 gameState={gameState as "won" | "lost"}
                 xpEarned={earnedXp}
             />
-        </MobileGameLayout>
+            </MobileGameLayout>
+        </SafeAreaView>
     );
 }

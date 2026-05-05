@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
@@ -256,12 +256,14 @@ export default function NativeSamhengi() {
     }
 
     return (
-        <MobileGameLayout 
-            gameId="samhengi"
-            gameTitle="Samhengi" 
-            isGameOver={gameState !== 'playing'}
-            onBack={() => router.replace('/(tabs)')}
-        >
+        <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
+            <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+            <MobileGameLayout 
+                gameId="samhengi"
+                gameTitle="Samhengi" 
+                isGameOver={gameState !== 'playing'}
+                onBack={() => router.replace('/(tabs)')}
+            >
             <View className="flex-1 px-4 mt-2">
                 <Text className="text-slate-500 text-center mb-6">Finndu leyniorðið. Orðin eru raðuð eftir því hversu oft þau koma fyrir í sama samhengi og leyniorðið.</Text>
 
@@ -340,6 +342,7 @@ export default function NativeSamhengi() {
                 gameState={gameState as "won" | "lost"}
                 xpEarned={earnedXp}
             />
-        </MobileGameLayout>
+            </MobileGameLayout>
+        </SafeAreaView>
     );
 }
