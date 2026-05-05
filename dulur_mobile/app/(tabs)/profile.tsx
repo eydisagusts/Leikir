@@ -208,7 +208,6 @@ export default function ProfileScreen() {
                 <View style={{ flex: 1 }} />
                 <Text 
                     className="text-[32px] md:text-[36px] font-black font-serif tracking-tight text-[#1e1b4b] text-center mb-1"
-                    style={{ textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
                 >
                     Stillingar
                 </Text>

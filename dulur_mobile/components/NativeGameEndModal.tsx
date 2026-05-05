@@ -78,7 +78,6 @@ export const NativeGameEndModal: React.FC<NativeGameEndModalProps> = ({
                             </View>
                             <Text 
                                 className="text-[32px] font-black font-serif mb-2 text-[#0f172a] text-center tracking-tight"
-                                style={{ textShadowColor: '#0f172a', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
                             >
                                 Vel gert!
                             </Text>
@@ -94,7 +93,6 @@ export const NativeGameEndModal: React.FC<NativeGameEndModalProps> = ({
                             </View>
                             <Text 
                                 className="text-[32px] font-black font-serif mb-2 text-[#ef4444] text-center tracking-tight"
-                                style={{ textShadowColor: '#ef4444', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
                             >
                                 Kemur betur næst!
                             </Text>

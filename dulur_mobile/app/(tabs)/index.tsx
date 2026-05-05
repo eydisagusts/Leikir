@@ -402,7 +402,6 @@ export default function HomeHubScreen() {
 
                     <Text
                         className="text-[52px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center mb-2"
-                        style={{ textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
                     >
                         Dulur.
                     </Text>

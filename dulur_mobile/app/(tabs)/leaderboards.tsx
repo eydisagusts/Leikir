@@ -12,8 +12,9 @@ type LeaderboardPlayer = {
 
 export default function LeaderboardsScreen() {
     const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
+    const [monthlyPlayers, setMonthlyPlayers] = useState<LeaderboardPlayer[]>([]);
     const [friends, setFriends] = useState<LeaderboardPlayer[]>([]);
-    const [viewMode, setViewMode] = useState<'global' | 'friends'>('global');
+    const [viewMode, setViewMode] = useState<'global' | 'monthly' | 'friends'>('global');
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserStats, setCurrentUserStats] = useState<{ xp: number, rank: number, username: string } | null>(null);
     const [loading, setLoading] = useState(true);
@@ -36,6 +37,16 @@ export default function LeaderboardsScreen() {
 
                 if (globalErr) throw globalErr;
                 setPlayers(globalData || []);
+
+                // Fetch Monthly Top 50
+                const { data: monthlyData } = await supabase.rpc('get_monthly_global_leaderboard', { p_limit: 50 });
+                if (monthlyData) {
+                    setMonthlyPlayers(monthlyData.map((r: any) => ({
+                        id: r.id || r.user_id,
+                        username: r.username,
+                        xp: r.xp || r.total_score || r.total_xp || 0
+                    })));
+                }
 
                 if (userId) {
                     const { data: userData } = await supabase.from('profiles').select('username, xp').eq('id', userId).single();
@@ -78,9 +89,9 @@ export default function LeaderboardsScreen() {
         return () => profileSub.remove();
     }, []);
 
-    const currentList = viewMode === 'global' ? players : friends;
+    const currentList = viewMode === 'global' ? players : viewMode === 'monthly' ? monthlyPlayers : friends;
     const isUserInList = currentList.some(p => p.id === currentUserId);
-    const showStickyFooter = currentUserId && currentUserStats && !isUserInList && viewMode === 'global';
+    const showStickyFooter = currentUserId && currentUserStats && !isUserInList && (viewMode === 'global' || viewMode === 'monthly');
 
     const renderPlayerRow = (player: LeaderboardPlayer, idx: number, isSelf: boolean, forceRank?: number) => {
         const rankToDisplay = forceRank !== undefined ? forceRank : (idx + 1);
@@ -147,12 +158,11 @@ export default function LeaderboardsScreen() {
             <View className="px-6 pt-12 pb-6 items-center justify-center">
                 <Text
                     className="text-[44px] leading-[1.1] font-black font-serif tracking-tighter text-[#1e1b4b] text-center mb-1"
-                    style={{ textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
                 >
                     Stigatafla.
                 </Text>
                 <Text className="text-[18px] font-medium font-serif italic text-slate-500 tracking-wide text-center">
-                    {viewMode === 'global' ? 'Topp 50 spilarar' : 'Stig meðal vina.'}
+                    {viewMode === 'global' ? 'Topp 50 spilarar' : viewMode === 'monthly' ? 'Stig þennan mánuðinn' : 'Stig meðal vina.'}
                 </Text>
             </View>
 
@@ -164,11 +174,18 @@ export default function LeaderboardsScreen() {
                         style={viewMode === 'global' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 } : {}}
                         onPress={() => setViewMode('global')}
                     >
-                        <Text
-                            className={`font-black tracking-wide ${viewMode === 'global' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}
-                            style={viewMode === 'global' ? { textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 0 } : {}}
-                        >
+                        <Text className={`font-black text-xs uppercase tracking-wider ${viewMode === 'global' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}>
                             Allir
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        className="flex-1 items-center py-3 rounded-xl"
+                        style={viewMode === 'monthly' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 } : {}}
+                        onPress={() => setViewMode('monthly')}
+                    >
+                        <Text className={`font-black text-xs uppercase tracking-wider ${viewMode === 'monthly' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}>
+                            Mánuður
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -177,10 +194,7 @@ export default function LeaderboardsScreen() {
                         style={viewMode === 'friends' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 } : {}}
                         onPress={() => setViewMode('friends')}
                     >
-                        <Text
-                            className={`font-black tracking-wide ${viewMode === 'friends' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}
-                            style={viewMode === 'friends' ? { textShadowColor: '#1e1b4b', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 0 } : {}}
-                        >
+                        <Text className={`font-black text-xs uppercase tracking-wider ${viewMode === 'friends' ? 'text-[#1e1b4b]' : 'text-slate-500'}`}>
                             Vinir
                         </Text>
                     </TouchableOpacity>

@@ -116,7 +116,6 @@ export default function EventsScreen() {
                     )}
                     <Text
                         className="text-[44px] leading-[1.1] font-white font-serif tracking-tighter text-white text-center mb-1"
-                        style={{ textShadowColor: 'white', textShadowOffset: { width: 0.5, height: 0.5 }, textShadowRadius: 1 }}
                     >
                         Viðburðir.
                     </Text>
