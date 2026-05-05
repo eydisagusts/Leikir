@@ -81,25 +81,25 @@ function RootLayoutNav() {
     const checkAuthStatus = async () => {
         try {
             const { data: { session }, error } = await supabase.auth.getSession();
-            const onLoginScreen = segments[0] === 'login';
+            const isPublicScreen = segments[0] === 'login' || segments[0] === 'signup';
 
             if (error || !session) {
-                if (!onLoginScreen) router.replace('/login');
-            } else if (session && onLoginScreen) {
+                if (!isPublicScreen) router.replace('/login');
+            } else if (session && isPublicScreen) {
                 router.replace('/(tabs)');
             }
         } catch (e) {
-            if (segments[0] !== 'login') router.replace('/login');
+            if (segments[0] !== 'login' && segments[0] !== 'signup') router.replace('/login');
         }
     };
     
     checkAuthStatus();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        const onLoginScreen = segments[0] === 'login';
-        if (!session && !onLoginScreen) {
+        const isPublicScreen = segments[0] === 'login' || segments[0] === 'signup';
+        if (!session && !isPublicScreen) {
             router.replace('/login');
-        } else if (session && onLoginScreen) {
+        } else if (session && isPublicScreen) {
             router.replace('/(tabs)');
         }
     });
@@ -111,6 +111,7 @@ function RootLayoutNav() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="signup" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="game" options={{ headerShown: false, animation: 'fade' }} />
       </Stack>
