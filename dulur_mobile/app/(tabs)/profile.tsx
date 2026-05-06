@@ -333,6 +333,27 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </View>
 
+                {/* Subscriptions */}
+                <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Áskrift</Text>
+                <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
+                    <View className="p-4 flex-row items-center justify-between border-b border-gray-50 bg-white">
+                        <View className="flex-row items-center">
+                            <Ionicons name={profile?.is_subscribed ? "diamond" : "lock-closed"} size={20} color={profile?.is_subscribed ? "#4f46e5" : "#64748b"} />
+                            <Text className={`font-semibold text-[16px] ml-3 ${profile?.is_subscribed ? 'text-indigo-900' : 'text-slate-700'}`}>Staða Áskriftar</Text>
+                        </View>
+                        <Text className="font-bold text-slate-800 text-[15px]">
+                            {profile?.is_subscribed ? 'Virk áskrift' : 'Engin'}
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => Linking.openURL('https://dulur.is')}
+                        className="p-4 flex-row justify-center items-center bg-slate-50/50"
+                    >
+                        <Ionicons name="open-outline" size={16} color="#4f46e5" />
+                        <Text className="text-indigo-600 font-bold text-[15px] ml-2">Stjórna á dulur.is</Text>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Account Deletion */}
                 <TouchableOpacity
                     className="bg-white rounded-2xl border border-red-100 p-4 items-center shadow-sm mb-6 flex-row justify-center"
