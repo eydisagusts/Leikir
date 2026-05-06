@@ -3,7 +3,10 @@ const fs = require('fs');
 
 // VINSAMLEGAST FYLLTU ÚT ÞESSI 4 ATRIÐI:
 const teamId = '63Z3833G4P';                  // Dæmi: "A1B2C3D4E5" (Sést í Apple Developer efst í horninu)
-const clientId = 'is.dulur.app';                // The App Bundle ID
+// MIKILVÆGT FYRIR VEF (WEBSITE): Þú MÁTT EKKI nota App ID ('is.dulur.app') hér fyrir vefinn!
+// Þú verður að búa til "Services ID" (t.d. "is.dulur.web") í Apple Developer -> Identifiers, 
+// tengja það við primary App ID, og setja Return URL. Notaðu síðan Services ID-ið hér.
+const clientId = 'is.dulur.web';                // Breyttu þessu í þitt "Services ID" identifier!
 const keyId = 'N2ZXKT96XF';                    // Dæmi: "X9Y8Z7K6L5" (Færð thegar the býrð til lykilinn í Apple Developer)
 
 // STUÐNINGUR FYRIR .p8 SKJALIÐ. 

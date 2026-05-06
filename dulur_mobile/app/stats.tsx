@@ -1,14 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, ActivityIndicator, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function GameHybridWrapper() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const isEvent = useLocalSearchParams<{ isEvent: string }>()?.isEvent === 'true';
+export default function StatsScreen() {
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const insets = useSafeAreaInsets();
@@ -18,12 +16,11 @@ export default function GameHybridWrapper() {
   const [webViewLoaded, setWebViewLoaded] = useState(false);
 
   const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
-  const targetPath = isEvent ? `vidburdur/${id}` : id;
   
-  let gameUrl = `${BASE_URL}/is/${targetPath}?appview=true`;
+  let statsUrl = `${BASE_URL}/is/tolfraedi?appview=true`;
   if (sessionData?.refresh_token) {
-    const encodedTarget = encodeURIComponent(`/is/${targetPath}?appview=true`);
-    gameUrl = `${BASE_URL}/api/auth/sync?refresh_token=${sessionData.refresh_token}&redirect=${encodedTarget}`;
+    const encodedTarget = encodeURIComponent(`/is/tolfraedi?appview=true`);
+    statsUrl = `${BASE_URL}/api/auth/sync?refresh_token=${sessionData.refresh_token}&redirect=${encodedTarget}`;
   }
 
   useEffect(() => {
@@ -35,6 +32,7 @@ export default function GameHybridWrapper() {
     setSessionData(session);
     setReady(true);
   };
+  
   const INJECTED_JS = `
     (function() {
       const style = document.createElement('style');
@@ -47,10 +45,6 @@ export default function GameHybridWrapper() {
             -webkit-user-select: none;
             user-select: none;
         }
-        
-
-
-        #mobile-menu, header[class*="sticky"], footer { display: none !important; }
       \`;
       document.documentElement.appendChild(style);
       
@@ -80,7 +74,6 @@ export default function GameHybridWrapper() {
     <View className="flex-1 bg-background">
       <Stack.Screen options={{ headerShown: false, animation: 'fade' }} />
       
-      {/* Loading Overlay covers the webview until it perfectly loads */}
       {!webViewLoaded && (
         <View className="absolute inset-0 z-40 bg-background flex-1 justify-center items-center">
             <ActivityIndicator size="large" color="#1c1917" />
@@ -96,12 +89,14 @@ export default function GameHybridWrapper() {
                  <Ionicons name="chevron-back" size={18} color="#475569" />
                  <Text className="text-[15px] font-black text-slate-700 ml-1">Til baka</Text>
               </TouchableOpacity>
+              <Text className="text-[18px] font-black font-serif text-[#1e1b4b] mr-4">Tölfræði</Text>
+              <View style={{ width: 60 }} />
           </View>
       </View>
       
       <WebView
         ref={webViewRef}
-        source={{ uri: gameUrl }}
+        source={{ uri: statsUrl }}
         sharedCookiesEnabled={true}
         injectedJavaScriptBeforeContentLoaded={INJECTED_JS}
         bounces={true}

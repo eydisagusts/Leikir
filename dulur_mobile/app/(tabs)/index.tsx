@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, DeviceEventEmitter } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, DeviceEventEmitter, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -377,12 +377,21 @@ export default function HomeHubScreen() {
     }, []);
 
     const handleGamePress = React.useCallback((id: string) => {
-        if (['ordla', 'stafarugl', 'tengingar', 'hengimadur', 'krossgata', 'sudoku', 'straumur', 'sprengjuleit', 'kviss', 'litakodi', 'minnisspil', 'myndagata', 'samhengi'].includes(id)) {
-            router.push(`/game/native/${id}` as any);
-        } else {
-            router.push(`/game/${id}` as any);
+        const game = GAMES.find(g => g.id === id);
+        if (game?.badge === 'ÁSKRIFT' && !isSubscribed) {
+            Alert.alert(
+                'Áskrift nauðsynleg',
+                'Þessi leikur er einungis fyrir áskrifendur Dulur.',
+                [
+                    { text: 'Skoða áskrift', onPress: () => router.push('/(tabs)/profile') },
+                    { text: 'Loka', style: 'cancel' }
+                ]
+            );
+            return;
         }
-    }, []);
+
+        router.push(`/game/native/${id}` as any);
+    }, [isSubscribed]);
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>

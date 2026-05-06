@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, ScrollView, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -217,7 +217,7 @@ export default function NativeSamhengi() {
         let minDiff = Infinity;
 
         for (const [word, rank] of Object.entries((puzzleData as any).ranks)) {
-            if (typeof rank === 'number' && rank > 1 && !guesses.some(g => g.word === word)) {
+            if (typeof rank === 'number' && rank > 1 && !guesses.some(g => g.word === word) && word === word.toLowerCase() && /^[a-záðéíóúýþæö]+$/.test(word)) {
                 const diff = Math.abs(rank - targetRank);
                 if (diff < minDiff) {
                     minDiff = diff;
@@ -233,6 +233,56 @@ export default function NativeSamhengi() {
             setGuesses(newGuesses);
             setHintsUsed(h => h + 1);
         }
+    };
+
+    const handleGiveUp = () => {
+        if (gameState !== 'playing' || !puzzleData) return;
+        Alert.alert(
+            'Gefast upp?',
+            'Ertu viss um að þú viljir gefast upp? Þú færð 0 XP fyrir leikinn.',
+            [
+                { text: 'Hætta við', style: 'cancel' },
+                {
+                    text: 'Gefast upp', style: 'destructive', onPress: async () => {
+                        let targetWord = "";
+                        for (const [word, rank] of Object.entries(puzzleData.ranks)) {
+                            if (rank === 1) {
+                                targetWord = word;
+                                break;
+                            }
+                        }
+                        if (targetWord) {
+                            const newGuesses = [...guesses, { word: targetWord, rank: 1 }];
+                            newGuesses.sort((a, b) => a.rank - b.rank);
+                            setGuesses(newGuesses);
+                            setGameState('won');
+                            setEarnedXp(0);
+                            setIsFreshGameOver(true);
+                            saveStateToDb();
+
+                            const { data: { session } } = await supabase.auth.getSession();
+                            if (session?.user) {
+                                try {
+                                    await fetch(`${API_URL}/api/mobile/samhengi`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${session.access_token}`
+                                        },
+                                        body: JSON.stringify({
+                                            won: true,
+                                            guessesCount: newGuesses.length,
+                                            hintsUsed,
+                                            timeTakenSeconds: 60
+                                        })
+                                    });
+                                } catch (e) { }
+                            }
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (gameState === 'loading') {
@@ -286,16 +336,24 @@ export default function NativeSamhengi() {
                 <View className="flex-row justify-between items-center mb-4 px-1">
                     <Text className="text-sm font-bold text-slate-500">{guesses.length} ágiskanir</Text>
                     {gameState === 'playing' && (
-                        <TouchableOpacity 
-                            onPress={handleHint}
-                            disabled={hintsUsed >= 6}
-                            className={`px-3 py-1.5 rounded-full flex-row items-center ${hintsUsed > 0 ? 'bg-amber-100 border border-amber-300' : 'bg-slate-100'}`}
-                        >
-                            <Ionicons name="bulb" size={16} color={hintsUsed > 0 ? '#d97706' : '#64748b'} />
-                            <Text className={`font-bold ml-1 text-xs ${hintsUsed > 0 ? 'text-amber-600' : 'text-slate-500'}`}>
-                                Vísbending {hintsUsed > 0 && `(-${hintsUsed * 10} XP)`}
-                            </Text>
-                        </TouchableOpacity>
+                        <View className="flex-row items-center gap-2">
+                            <TouchableOpacity 
+                                onPress={handleGiveUp}
+                                className="px-3 py-1.5 rounded-full flex-row items-center bg-red-50 border border-red-200"
+                            >
+                                <Text className="font-bold text-xs text-red-500">Gefast upp</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={handleHint}
+                                disabled={hintsUsed >= 6}
+                                className={`px-3 py-1.5 rounded-full flex-row items-center ${hintsUsed > 0 ? 'bg-amber-100 border border-amber-300' : 'bg-slate-100'}`}
+                            >
+                                <Ionicons name="bulb" size={16} color={hintsUsed > 0 ? '#d97706' : '#64748b'} />
+                                <Text className={`font-bold ml-1 text-xs ${hintsUsed > 0 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                    Vísbending {hintsUsed > 0 && `(-${hintsUsed * 10} XP)`}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
 
@@ -337,7 +395,7 @@ export default function NativeSamhengi() {
 
             <NativeGameEndModal
                 visible={isFreshGameOver}
-                onClose={handleCloseModal}
+                onContinue={handleCloseModal}
                 gameTitle="Samhengi"
                 gameState={gameState as "won" | "lost"}
                 xpEarned={earnedXp}

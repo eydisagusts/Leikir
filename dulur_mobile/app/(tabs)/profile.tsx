@@ -219,6 +219,15 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView className="flex-1 px-4 mt-6" contentContainerStyle={{ paddingBottom: 150, alignSelf: 'center', width: '100%', maxWidth: 600 }}>
+                {/* Statistics Button */}
+                <TouchableOpacity 
+                    className="bg-indigo-600 rounded-2xl p-4 items-center flex-row justify-center shadow-md mb-8 shadow-indigo-600/20 active:bg-indigo-700 transition-colors"
+                    onPress={() => router.push('/stats')}
+                >
+                    <Ionicons name="bar-chart" size={20} color="#ffffff" />
+                    <Text className="text-white font-black text-[18px] ml-2 tracking-wide">Skoða Tölfræði</Text>
+                </TouchableOpacity>
+
                 {/* Account Details */}
                 <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Aðgangur</Text>
                 <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
