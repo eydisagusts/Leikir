@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, Dimensions, PanResponder, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, Dimensions, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,9 +31,6 @@ export default function NativeMyndagata() {
     const xpAnimY = useSharedValue(0);
     const xpAnimOpacity = useSharedValue(0);
 
-    const gridRef = useRef<View>(null);
-    const gridLayout = useRef({ x: 0, y: 0, width: 0, height: 0 });
-    const isDrawingRef = useRef(false);
     const lastCellRef = useRef({ r: -1, c: -1 });
 
     const handleCloseModal = () => {
@@ -185,113 +182,47 @@ export default function NativeMyndagata() {
         );
     };
 
-    const updateCellFromCoordinates = (x: number, y: number) => {
+    const handleTouch = (localX: number, localY: number, isFirstTap: boolean) => {
         if (gameState !== 'playing') return;
-        if (gridLayout.current.width === 0) return;
+
+        // Add small padding to bounds check since dragging can slip outside slightly
+        if (localX < -10 || localX > gridDisplaySize + 10 || localY < -10 || localY > gridDisplaySize + 10) return;
 
         const cols = puzzleData.solution[0].length;
         const rows = puzzleData.solution.length;
         
-        const cellW = gridLayout.current.width / cols;
-        const cellH = gridLayout.current.height / rows;
+        const cellW = gridDisplaySize / cols;
+        const cellH = gridDisplaySize / rows;
 
-        // Local coordinates relative to the grid
-        let localX = x - gridLayout.current.x;
-        let localY = y - gridLayout.current.y;
+        const clampedX = Math.max(0, Math.min(localX, gridDisplaySize - 1));
+        const clampedY = Math.max(0, Math.min(localY, gridDisplaySize - 1));
 
-        // If coordinates are completely off due to a bad measure, let's just attempt to measure synchronously again using the layout width
-        // Wait, gestureState.moveX is global. If gridLayout.x is 0 but it's actually in the middle of the screen, we need a reliable fallback.
-        // A simple trick: Since we know the grid is centered, we can guess its global X:
-        // const guessedX = (Dimensions.get('window').width - gridLayout.current.width) / 2;
-        // But measuring again is better.
+        const c = Math.floor(clampedX / cellW);
+        const r = Math.floor(clampedY / cellH);
 
-        if (localX >= -10 && localX <= gridLayout.current.width + 10 && localY >= -10 && localY <= gridLayout.current.height + 10) {
-            // Clamp to grid boundaries
-            localX = Math.max(0, Math.min(localX, gridLayout.current.width - 1));
-            localY = Math.max(0, Math.min(localY, gridLayout.current.height - 1));
-
-            const c = Math.floor(localX / cellW);
-            const r = Math.floor(localY / cellH);
-
-            if (r >= 0 && r < rows && c >= 0 && c < cols) {
-                if (lastCellRef.current.r !== r || lastCellRef.current.c !== c) {
-                    lastCellRef.current = { r, c };
+        if (r >= 0 && r < rows && c >= 0 && c < cols) {
+            if (lastCellRef.current.r !== r || lastCellRef.current.c !== c) {
+                lastCellRef.current = { r, c };
+                
+                setGrid(prev => {
+                    const currentVal = prev[r][c];
+                    const next = [...prev];
+                    next[r] = [...next[r]];
                     
-                    setGrid(prev => {
-                        const currentVal = prev[r][c];
-                        const next = [...prev];
-                        next[r] = [...next[r]];
-                        
-                        let targetVal: CellState = 1;
-                        if (drawMode === 'mark') {
-                            targetVal = currentVal === 2 ? 0 : 2;
-                        } else {
-                            targetVal = currentVal === 1 ? 0 : 1;
-                        }
+                    const brushVal = drawMode === 'mark' ? 2 : 1;
+                    
+                    if (isFirstTap) {
+                        next[r][c] = currentVal === brushVal ? 0 : brushVal;
+                    } else {
+                        next[r][c] = brushVal;
+                    }
 
-                        // We only want to set to targetVal if it's not already that, to prevent toggling back and forth when sliding
-                        // Wait, a standard sliding fill: we should decide the "brush" state on touch start.
-                        // For simplicity, we just set it to the active tool.
-                        const brushVal = drawMode === 'mark' ? 2 : 1;
-                        // Actually, if we just tapped it, we toggle. If we slide, we paint.
-                        // To keep it simple: just paint with the brush. If they tap an already painted cell, we erase it.
-                        
-                        if (!isDrawingRef.current) {
-                            // First tap - determine brush
-                            isDrawingRef.current = true;
-                            next[r][c] = currentVal === brushVal ? 0 : brushVal;
-                        } else {
-                            // Sliding - paint with active brush
-                            next[r][c] = brushVal;
-                        }
-
-                        // Debounce save state
-                        setTimeout(() => saveStateToDb(next), 1000);
-                        return next;
-                    });
-                }
+                    setTimeout(() => saveStateToDb(next), 1000);
+                    return next;
+                });
             }
         }
     };
-
-    const measureGrid = () => {
-        gridRef.current?.measure((x, y, w, h, pageX, pageY) => {
-            if (w > 0 && h > 0) {
-                gridLayout.current = { x: pageX, y: pageY, width: w, height: h };
-            }
-        });
-    };
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: (evt, gestureState) => {
-                setScrollEnabled(false);
-                measureGrid(); // Guarantee accurate coordinates
-                isDrawingRef.current = false; // Reset brush state
-                lastCellRef.current = { r: -1, c: -1 };
-                
-                // Allow a small delay for measure to complete if it was wrong
-                setTimeout(() => {
-                    updateCellFromCoordinates(gestureState.x0, gestureState.y0);
-                }, 10);
-            },
-            onPanResponderMove: (evt, gestureState) => {
-                isDrawingRef.current = true;
-                updateCellFromCoordinates(gestureState.moveX, gestureState.moveY);
-            },
-            onPanResponderRelease: () => {
-                setScrollEnabled(true);
-                isDrawingRef.current = false;
-                lastCellRef.current = { r: -1, c: -1 };
-            },
-            onPanResponderTerminate: () => {
-                setScrollEnabled(true);
-                isDrawingRef.current = false;
-            }
-        })
-    ).current;
 
     if (gameState === 'loading') {
         return (
@@ -375,17 +306,20 @@ export default function NativeMyndagata() {
 
                             {/* The Grid */}
                             <View 
-                                ref={gridRef}
-                                onLayout={(e) => {
-                                    const { width: w, height: h } = e.nativeEvent.layout;
-                                    gridLayout.current.width = w;
-                                    gridLayout.current.height = h;
-                                    measureGrid();
-                                }}
                                 style={{ width: gridDisplaySize, height: gridDisplaySize, backgroundColor: '#1e293b', borderWidth: 2, borderColor: '#1e293b' }}
-                                {...panResponder.panHandlers}
+                                onStartShouldSetResponder={() => true}
+                                onResponderGrant={(e) => {
+                                    setScrollEnabled(false);
+                                    lastCellRef.current = { r: -1, c: -1 };
+                                    handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY, true);
+                                }}
+                                onResponderMove={(e) => {
+                                    handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY, false);
+                                }}
+                                onResponderRelease={() => setScrollEnabled(true)}
+                                onResponderTerminate={() => setScrollEnabled(true)}
                             >
-                                <View className="flex-1 flex-col justify-between">
+                                <View className="flex-1 flex-col justify-between" pointerEvents="none">
                                     {grid.map((row, r) => (
                                         <View key={`r-${r}`} className="flex-1 flex-row justify-between">
                                             {row.map((cell, c) => {
