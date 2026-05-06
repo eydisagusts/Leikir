@@ -22,6 +22,8 @@ export default function NativeMyndagata() {
     // User requested better toggles
     const [drawMode, setDrawMode] = useState<'fill' | 'mark'>('fill');
 
+    const [scrollEnabled, setScrollEnabled] = useState(true);
+
     const [earnedXp, setEarnedXp] = useState<number>(0);
     const [showFlyXp, setShowFlyXp] = useState(false);
     const [isFreshGameOver, setIsFreshGameOver] = useState(false);
@@ -194,10 +196,20 @@ export default function NativeMyndagata() {
         const cellH = gridLayout.current.height / rows;
 
         // Local coordinates relative to the grid
-        const localX = x - gridLayout.current.x;
-        const localY = y - gridLayout.current.y;
+        let localX = x - gridLayout.current.x;
+        let localY = y - gridLayout.current.y;
 
-        if (localX >= 0 && localX <= gridLayout.current.width && localY >= 0 && localY <= gridLayout.current.height) {
+        // If coordinates are completely off due to a bad measure, let's just attempt to measure synchronously again using the layout width
+        // Wait, gestureState.moveX is global. If gridLayout.x is 0 but it's actually in the middle of the screen, we need a reliable fallback.
+        // A simple trick: Since we know the grid is centered, we can guess its global X:
+        // const guessedX = (Dimensions.get('window').width - gridLayout.current.width) / 2;
+        // But measuring again is better.
+
+        if (localX >= -10 && localX <= gridLayout.current.width + 10 && localY >= -10 && localY <= gridLayout.current.height + 10) {
+            // Clamp to grid boundaries
+            localX = Math.max(0, Math.min(localX, gridLayout.current.width - 1));
+            localY = Math.max(0, Math.min(localY, gridLayout.current.height - 1));
+
             const c = Math.floor(localX / cellW);
             const r = Math.floor(localY / cellH);
 
@@ -242,22 +254,41 @@ export default function NativeMyndagata() {
         }
     };
 
+    const measureGrid = () => {
+        gridRef.current?.measure((x, y, w, h, pageX, pageY) => {
+            if (w > 0 && h > 0) {
+                gridLayout.current = { x: pageX, y: pageY, width: w, height: h };
+            }
+        });
+    };
+
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
             onPanResponderGrant: (evt, gestureState) => {
+                setScrollEnabled(false);
+                measureGrid(); // Guarantee accurate coordinates
                 isDrawingRef.current = false; // Reset brush state
                 lastCellRef.current = { r: -1, c: -1 };
-                updateCellFromCoordinates(gestureState.x0, gestureState.y0);
+                
+                // Allow a small delay for measure to complete if it was wrong
+                setTimeout(() => {
+                    updateCellFromCoordinates(gestureState.x0, gestureState.y0);
+                }, 10);
             },
             onPanResponderMove: (evt, gestureState) => {
                 isDrawingRef.current = true;
                 updateCellFromCoordinates(gestureState.moveX, gestureState.moveY);
             },
             onPanResponderRelease: () => {
+                setScrollEnabled(true);
                 isDrawingRef.current = false;
                 lastCellRef.current = { r: -1, c: -1 };
+            },
+            onPanResponderTerminate: () => {
+                setScrollEnabled(true);
+                isDrawingRef.current = false;
             }
         })
     ).current;
@@ -282,15 +313,17 @@ export default function NativeMyndagata() {
         );
     }
 
-    const gridDisplaySize = Math.min(width * 0.9, 400);
-    const cols = puzzleData.solution[0].length;
-    const rows = puzzleData.solution.length;
-
     // Calculate max clue lengths to allocate space
     const maxRowClues = Math.max(...puzzleData.rowClues.map((c: any) => c.length || 1));
     const maxColClues = Math.max(...puzzleData.colClues.map((c: any) => c.length || 1));
 
-    const clueFontSize = cols >= 15 ? 10 : 12;
+    // Ensure grid display size leaves room for the row clues so it doesn't overflow!
+    const rowClueWidth = maxRowClues * 12 + 10;
+    const gridDisplaySize = Math.min(width * 0.9 - rowClueWidth, 350);
+    const cols = puzzleData.solution[0].length;
+    const rows = puzzleData.solution.length;
+
+    const clueFontSize = cols >= 15 ? 9 : 11;
     const cellBorder = 0.5;
 
     return (
@@ -302,7 +335,7 @@ export default function NativeMyndagata() {
                 isGameOver={gameState !== 'playing'}
                 onBack={() => router.replace('/(tabs)')}
             >
-            <ScrollView className="flex-1" contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>
+            <ScrollView scrollEnabled={scrollEnabled} className="flex-1" contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>
                 
                 <View className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 w-[95%]">
                     
@@ -344,9 +377,10 @@ export default function NativeMyndagata() {
                             <View 
                                 ref={gridRef}
                                 onLayout={(e) => {
-                                    gridRef.current?.measure((x, y, w, h, pageX, pageY) => {
-                                        gridLayout.current = { x: pageX, y: pageY, width: w, height: h };
-                                    });
+                                    const { width: w, height: h } = e.nativeEvent.layout;
+                                    gridLayout.current.width = w;
+                                    gridLayout.current.height = h;
+                                    measureGrid();
                                 }}
                                 style={{ width: gridDisplaySize, height: gridDisplaySize, backgroundColor: '#1e293b', borderWidth: 2, borderColor: '#1e293b' }}
                                 {...panResponder.panHandlers}
@@ -438,7 +472,7 @@ export default function NativeMyndagata() {
 
             <NativeGameEndModal
                 visible={isFreshGameOver}
-                onClose={handleCloseModal}
+                onContinue={handleCloseModal}
                 gameTitle="Myndagáta"
                 gameState={gameState as "won" | "lost"}
                 xpEarned={earnedXp}
