@@ -283,7 +283,7 @@ export default function NativeHengimadur() {
             {/* Hidden Word Display */}
             <View className="flex-row flex-wrap justify-center px-4 mb-10 gap-x-3 gap-y-4">
                 {targetWord.split('').map((char, idx) => {
-                    const isRevealed = guessedLetters.includes(char) || gameState === 'lost';
+                    const isRevealed = guessedLetters.includes(char) || gameState === 'lost' || gameState === 'won';
                     const isMissing = !guessedLetters.includes(char) && gameState === 'lost';
                     return (
                         <View key={idx} className="items-center justify-end" style={{ width: 32, height: 48, borderBottomWidth: 3, borderBottomColor: isMissing ? '#EF4444' : '#1A1A1B' }}>

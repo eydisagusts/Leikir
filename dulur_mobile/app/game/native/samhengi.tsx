@@ -175,6 +175,7 @@ export default function NativeSamhengi() {
                             'Authorization': `Bearer ${session.access_token}`
                         },
                         body: JSON.stringify({
+                            action: 'save',
                             won: true,
                             guessesCount: newGuesses.length,
                             hintsUsed,
@@ -269,6 +270,7 @@ export default function NativeSamhengi() {
                                             'Authorization': `Bearer ${session.access_token}`
                                         },
                                         body: JSON.stringify({
+                                            action: 'save',
                                             won: false,
                                             guessesCount: newGuesses.length,
                                             hintsUsed,
