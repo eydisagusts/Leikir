@@ -29,6 +29,8 @@ const GAMES = [
     { id: 'kviss', name: 'Kviss' },
     { id: 'litakodi', name: 'Litakóði' },
     { id: 'minnisspil', name: 'Minnisspil' },
+    { id: 'myndagata', name: 'Myndagáta' },
+    { id: 'samhengi', name: 'Samhengi' },
     { id: 'sprengjuleit', name: 'Sprengjuleit' },
     { id: 'stafarugl', name: 'Stafarugl' },
     { id: 'stafasveimur', name: 'Stafasveimur' },

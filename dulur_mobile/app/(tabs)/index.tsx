@@ -322,28 +322,34 @@ const GameCard = React.memo(({
     
     return (
         <TouchableOpacity
-            activeOpacity={0.7}
+            activeOpacity={0.8}
             onPress={() => onPress(game.id)}
             className="mb-8"
             style={{ width: cardWidth }}
         >
             <View
-                className="w-full aspect-[4/3] bg-white rounded-3xl border border-black/5 shadow-sm mb-3.5 overflow-hidden justify-center items-center"
-                style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 6 }, shadowRadius: 10 }}
+                className="w-full aspect-[4/3] bg-white rounded-[28px] border border-slate-100 mb-3.5 overflow-hidden justify-center items-center"
+                style={{ 
+                    elevation: 8, 
+                    shadowColor: '#1e1b4b', 
+                    shadowOpacity: 0.08, 
+                    shadowOffset: { width: 0, height: 12 }, 
+                    shadowRadius: 24 
+                }}
             >
                 <GameGraphic type={game.iconType} />
 
                 {showBadge && (
-                    <View className="absolute top-2.5 right-2.5 bg-[#1e1b4b] px-2 py-1 rounded-[6px] shadow-sm flex-row items-center gap-1.5" style={{ elevation: 2 }}>
-                        <Ionicons name="star" size={8} color="#EAB308" />
-                        <Text className="text-[8px] font-black uppercase text-white tracking-widest leading-none">{game.badge}</Text>
+                    <View className="absolute top-3 right-3 bg-indigo-950/90 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5" style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
+                        <Ionicons name="lock-closed" size={10} color="#EAB308" />
+                        <Text className="text-[9px] font-black uppercase text-white tracking-widest leading-none">{game.badge}</Text>
                     </View>
                 )}
             </View>
 
-            <View className="px-1">
-                <Text className="text-[18px] font-black font-serif tracking-tight text-[#1e1b4b] leading-tight">{game.name}</Text>
-                <Text className="text-[12px] font-medium text-slate-500 tracking-normal leading-snug mt-1.5" numberOfLines={2}>{game.desc}</Text>
+            <View className="px-2">
+                <Text className="text-[19px] font-black font-serif tracking-tight text-[#0f172a] leading-tight">{game.name}</Text>
+                <Text className="text-[13px] font-medium text-slate-500 tracking-normal leading-snug mt-1" numberOfLines={2}>{game.desc}</Text>
             </View>
         </TouchableOpacity>
     );

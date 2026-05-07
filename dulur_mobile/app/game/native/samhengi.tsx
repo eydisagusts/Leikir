@@ -20,7 +20,7 @@ export default function NativeSamhengi() {
     const [puzzleData, setPuzzleData] = useState<any>(null);
     const [guesses, setGuesses] = useState<Guess[]>([]);
     const [currentInput, setCurrentInput] = useState('');
-    const [gameState, setGameState] = useState<'playing' | 'won' | 'loading' | 'error'>('loading');
+    const [gameState, setGameState] = useState<'playing' | 'won' | 'given_up' | 'loading' | 'error'>('loading');
     const [hintsUsed, setHintsUsed] = useState(0);
     const [toast, setToast] = useState<string | null>(null);
 
@@ -217,7 +217,7 @@ export default function NativeSamhengi() {
         let minDiff = Infinity;
 
         for (const [word, rank] of Object.entries((puzzleData as any).ranks)) {
-            if (typeof rank === 'number' && rank > 1 && !guesses.some(g => g.word === word) && word === word.toLowerCase() && /^[a-záðéíóúýþæö]+$/.test(word)) {
+            if (typeof rank === 'number' && rank > 1 && !guesses.some(g => g.word === word) && word === word.toUpperCase() && /^[A-ZÁÐÉÍÓÚÝÞÆÖ]+$/.test(word)) {
                 const diff = Math.abs(rank - targetRank);
                 if (diff < minDiff) {
                     minDiff = diff;
@@ -255,9 +255,8 @@ export default function NativeSamhengi() {
                             const newGuesses = [...guesses, { word: targetWord, rank: 1 }];
                             newGuesses.sort((a, b) => a.rank - b.rank);
                             setGuesses(newGuesses);
-                            setGameState('won');
+                            setGameState('given_up');
                             setEarnedXp(0);
-                            setIsFreshGameOver(true);
                             saveStateToDb();
 
                             const { data: { session } } = await supabase.auth.getSession();
@@ -270,7 +269,7 @@ export default function NativeSamhengi() {
                                             'Authorization': `Bearer ${session.access_token}`
                                         },
                                         body: JSON.stringify({
-                                            won: true,
+                                            won: false,
                                             guessesCount: newGuesses.length,
                                             hintsUsed,
                                             timeTakenSeconds: 60
@@ -320,7 +319,10 @@ export default function NativeSamhengi() {
                 <View className="relative w-full mb-4">
                     <TextInput
                         value={currentInput}
-                        onChangeText={setCurrentInput}
+                        onChangeText={(text) => {
+                            DeviceEventEmitter.emit('start-timer');
+                            setCurrentInput(text);
+                        }}
                         onSubmitEditing={handleGuess}
                         placeholder="Skrifaðu orð..."
                         placeholderTextColor="#94a3b8"

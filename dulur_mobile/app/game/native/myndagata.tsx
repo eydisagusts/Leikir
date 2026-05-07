@@ -22,8 +22,6 @@ export default function NativeMyndagata() {
     // User requested better toggles
     const [drawMode, setDrawMode] = useState<'fill' | 'mark'>('fill');
 
-    const [scrollEnabled, setScrollEnabled] = useState(true);
-
     const [earnedXp, setEarnedXp] = useState<number>(0);
     const [showFlyXp, setShowFlyXp] = useState(false);
     const [isFreshGameOver, setIsFreshGameOver] = useState(false);
@@ -184,6 +182,8 @@ export default function NativeMyndagata() {
 
     const handleTouch = (localX: number, localY: number, isFirstTap: boolean) => {
         if (gameState !== 'playing') return;
+        
+        DeviceEventEmitter.emit('start-timer');
 
         // Add small padding to bounds check since dragging can slip outside slightly
         if (localX < -10 || localX > gridDisplaySize + 10 || localY < -10 || localY > gridDisplaySize + 10) return;
@@ -266,7 +266,7 @@ export default function NativeMyndagata() {
                 isGameOver={gameState !== 'playing'}
                 onBack={() => router.replace('/(tabs)')}
             >
-            <ScrollView scrollEnabled={scrollEnabled} className="flex-1" contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>
+            <ScrollView scrollEnabled={false} className="flex-1" contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>
                 
                 <View className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 w-[95%]">
                     
@@ -309,15 +309,12 @@ export default function NativeMyndagata() {
                                 style={{ width: gridDisplaySize, height: gridDisplaySize, backgroundColor: '#1e293b', borderWidth: 2, borderColor: '#1e293b' }}
                                 onStartShouldSetResponder={() => true}
                                 onResponderGrant={(e) => {
-                                    setScrollEnabled(false);
                                     lastCellRef.current = { r: -1, c: -1 };
                                     handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY, true);
                                 }}
                                 onResponderMove={(e) => {
                                     handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY, false);
                                 }}
-                                onResponderRelease={() => setScrollEnabled(true)}
-                                onResponderTerminate={() => setScrollEnabled(true)}
                             >
                                 <View className="flex-1 flex-col justify-between" pointerEvents="none">
                                     {grid.map((row, r) => (

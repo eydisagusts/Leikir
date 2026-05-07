@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Modal, ScrollView, Animated as NativeAnimated, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +35,40 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
         transform: [{ scale: xpScale }]
     };
 
+    const fetchGameData = useCallback(async () => {
+        try {
+            let leaderboardType = gameId;
+            if (gameId.startsWith('sudoku')) leaderboardType = 'sudoku';
+
+            const { data: { user } } = await supabase.auth.getUser();
+
+            const [leaderboardRes, profileRes, myResultsRes] = await Promise.all([
+                supabase.rpc('get_monthly_game_leaderboard', { p_game_type: leaderboardType, p_limit: 3 }),
+                user ? supabase.from('profiles').select('xp').eq('id', user.id).single() : Promise.resolve({ data: null }),
+                user ? supabase.from('game_results').select('won, time_taken_seconds').eq('user_id', user.id).eq('game_type', gameId) : Promise.resolve({ data: null })
+            ]);
+            
+            if (leaderboardRes.error) {
+                console.log('Error fetching top3:', leaderboardRes.error);
+            }
+            
+            if (leaderboardRes.data) setTop3(leaderboardRes.data);
+
+            if (profileRes.data) setTotalXp(profileRes.data.xp || 0);
+
+            const myResults = myResultsRes.data;
+            if (myResults && myResults.length > 0) {
+                const played = myResults.length;
+                const won = myResults.filter(r => r.won).length;
+                const totalTime = myResults.reduce((acc, curr) => acc + (curr.time_taken_seconds || 0), 0);
+                const avgTime = Math.round(totalTime / played);
+                setStats({ played, won, avgTime });
+            }
+        } catch (error) {
+            console.error("Layout fetch failed:", error);
+        }
+    }, [gameId]);
+
     useEffect(() => {
         const sub = DeviceEventEmitter.addListener('xp-earned', (earned: number) => {
             setTotalXp(prev => prev + earned);
@@ -46,46 +80,16 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
             ]).start();
             
             setTimeout(() => setXpBounce(false), 800);
+
+            // Re-fetch leaderboard with slight delay to ensure DB triggers have finished
+            setTimeout(() => fetchGameData(), 1000);
         });
         return () => sub.remove();
-    }, []);
+    }, [fetchGameData, xpScale]);
 
     useEffect(() => {
-        async function fetchGameData() {
-            try {
-                let leaderboardType = gameId;
-                if (gameId.startsWith('sudoku')) leaderboardType = 'sudoku';
-
-                const { data: { user } } = await supabase.auth.getUser();
-
-                const [leaderboardRes, profileRes, myResultsRes] = await Promise.all([
-                    supabase.rpc('get_monthly_game_leaderboard', { p_game_type: leaderboardType, p_limit: 3 }),
-                    user ? supabase.from('profiles').select('xp').eq('id', user.id).single() : Promise.resolve({ data: null }),
-                    user ? supabase.from('game_results').select('won, time_taken_seconds').eq('user_id', user.id).eq('game_type', gameId) : Promise.resolve({ data: null })
-                ]);
-                
-                if (leaderboardRes.error) {
-                    console.log('Error fetching top3:', leaderboardRes.error);
-                }
-                
-                if (leaderboardRes.data) setTop3(leaderboardRes.data);
-
-                if (profileRes.data) setTotalXp(profileRes.data.xp || 0);
-
-                const myResults = myResultsRes.data;
-                if (myResults && myResults.length > 0) {
-                    const played = myResults.length;
-                    const won = myResults.filter(r => r.won).length;
-                    const totalTime = myResults.reduce((acc, curr) => acc + (curr.time_taken_seconds || 0), 0);
-                    const avgTime = Math.round(totalTime / played);
-                    setStats({ played, won, avgTime });
-                }
-            } catch (error) {
-                console.error("Layout fetch failed:", error);
-            }
-        }
         fetchGameData();
-    }, [gameId]);
+    }, [fetchGameData]);
 
     // Timer Identity & Persistence
     useEffect(() => {
@@ -110,6 +114,10 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                     if (!isGameOver) {
                         setTimerActive(true);
                     }
+                }
+            } else {
+                if (isMounted && !isGameOver) {
+                    setTimerActive(true);
                 }
             }
         }
@@ -160,13 +168,15 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
         return () => subscription.remove();
     }, [timerKey, elapsedTime]);
 
-    // Auto-pause if GameOver
+    // Auto-pause or auto-start if GameOver changes
     useEffect(() => {
         if (isGameOver) {
             setTimerActive(false);
             if (timerKey && elapsedTime > 0) AsyncStorage.setItem(timerKey, elapsedTime.toString());
+        } else if (timerKey) {
+            setTimerActive(true);
         }
-    }, [isGameOver]);
+    }, [isGameOver, timerKey]);
 
     // Save timer exactly on unmount / switch
     useEffect(() => {
