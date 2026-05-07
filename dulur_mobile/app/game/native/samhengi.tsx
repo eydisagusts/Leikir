@@ -124,13 +124,13 @@ export default function NativeSamhengi() {
         return () => clearTimeout(timer);
     }, [guesses, hintsUsed]);
 
-    const saveStateToDb = async () => {
+    const saveStateToDb = async (currentGuesses?: Guess[]) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
         await supabase.from('game_states').upsert({
             user_id: session.user.id,
             game_type: 'samhengi',
-            state_json: { guesses, hintsUsed, puzzleId: puzzleData.id },
+            state_json: { guesses: currentGuesses || guesses, hintsUsed, puzzleId: puzzleData.id },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
     };
@@ -163,7 +163,7 @@ export default function NativeSamhengi() {
             const xp = Math.max(0, 100 - (hintsUsed * 10));
             setEarnedXp(xp);
             setIsFreshGameOver(true);
-            saveStateToDb();
+            saveStateToDb(newGuesses);
 
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
@@ -258,7 +258,7 @@ export default function NativeSamhengi() {
                             setGuesses(newGuesses);
                             setGameState('given_up');
                             setEarnedXp(0);
-                            saveStateToDb();
+                            saveStateToDb(newGuesses);
 
                             const { data: { session } } = await supabase.auth.getSession();
                             if (session?.user) {
