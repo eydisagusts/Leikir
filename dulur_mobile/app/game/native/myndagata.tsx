@@ -149,6 +149,7 @@ export default function NativeMyndagata() {
                             'Authorization': `Bearer ${session.access_token}`
                         },
                         body: JSON.stringify({
+                            action: 'save',
                             won: true,
                             timeTakenSeconds: 60
                         })

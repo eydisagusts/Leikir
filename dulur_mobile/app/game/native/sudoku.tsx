@@ -401,7 +401,7 @@ export default function NativeSudoku() {
     return (
         <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
             <Stack.Screen options={{ headerShown: false }} />
-            <MobileGameLayout onBack={() => router.back()} gameId={`sudoku_${difficulty}`} gameTitle="Sudoku">
+            <MobileGameLayout onBack={() => router.back()} gameId={`sudoku_${difficulty}`} gameTitle="Sudoku" isGameOver={gameState !== 'playing'}>
                 <View className="flex-1 w-full">
                 
                 <View className="items-center justify-center w-full px-4 pt-2 -mb-2 self-center z-10">

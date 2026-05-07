@@ -222,7 +222,7 @@ export default function NativeHengimadur() {
 
     return (
         <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
-            <MobileGameLayout onBack={() => router.back()} gameId={`hengimadur_${level}`} gameTitle="Hengimaður">
+            <MobileGameLayout onBack={() => router.back()} gameId={`hengimadur_${level}`} gameTitle="Hengimaður" isGameOver={gameState !== 'playing'}>
             
             {gameState === 'loading' && (
                 <View className="flex-1 items-center justify-center min-h-[500px]">
