@@ -298,8 +298,6 @@ export default function NativeKviss() {
                         winTitle={score === 5 ? 'Meistaralegt!' : score >= 3 ? 'Vel gert!' : 'Gengur betur næst'}
                         winDesc={`Þú svaraðir ${score} spurningum réttum!`}
                         onContinue={handleCloseModal}
-                        primaryButtonText="Deila niðurstöðu"
-                        onPrimaryAction={handleShare}
                     />
 
                     {showFlyXp && earnedXp !== null && earnedXp > 0 && (

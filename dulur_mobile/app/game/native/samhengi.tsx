@@ -121,6 +121,7 @@ export default function NativeSamhengi() {
                 console.error("Init Error", error);
                 setGameState('error');
             }
+        }
         init();
     }, []);
 
@@ -400,7 +401,7 @@ export default function NativeSamhengi() {
                             <Animated.View key={`${g.word}-${i}`} entering={FadeIn.duration(400)} className="w-full h-12 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex-row items-center px-4 relative">
                                 <View 
                                     className={`absolute left-0 top-0 bottom-0 ${getBarColor(g.rank)} opacity-30`} 
-                                    style={{ width: getBarWidth(g.rank) }} 
+                                    style={{ width: getBarWidth(g.rank) as any }} 
                                 />
                                 <View className="flex-1 flex-row justify-between items-center z-10">
                                     <Text className="font-bold uppercase text-lg text-slate-800">{g.word}</Text>

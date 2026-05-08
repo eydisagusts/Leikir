@@ -350,8 +350,6 @@ export default function NativeMinnisspil() {
                 winTitle="Leik lokið!"
                 winDesc={`Þú leystir spilið í ${turns} tilraunum.`}
                 onContinue={handleCloseModal}
-                primaryButtonText="Deila niðurstöðu"
-                onPrimaryAction={handleShare}
             />
 
             {showFlyXp && earnedXp !== null && earnedXp > 0 && (

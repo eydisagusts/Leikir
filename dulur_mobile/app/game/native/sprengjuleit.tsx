@@ -416,13 +416,11 @@ export default function NativeSprengjuleit() {
                     <NativeGameEndModal
                 gameTitle="Sprengjuleit"
                         visible={(gameState === 'won' || gameState === 'lost') && isFreshGameOver}
-                        gameState={gameState}
+                        gameState={gameState as "won" | "lost"}
                         xpEarned={earnedXp}
                         winTitle={gameState === 'won' ? 'Vel gert!' : 'Því miður!'}
                         winDesc={gameState === 'won' ? "Þú fannst allar sprengjurnar!" : "Þú steigst á sprengju!"}
                         onContinue={handleCloseModal}
-                        primaryButtonText={gameState === 'won' ? "Deila niðurstöðu" : undefined}
-                        onPrimaryAction={gameState === 'won' ? handleShare : undefined}
                     />
 
                     {showFlyXp && earnedXp !== null && earnedXp > 0 && (

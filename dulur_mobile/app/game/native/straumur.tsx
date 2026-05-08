@@ -132,8 +132,8 @@ export default function NativeStraumur() {
 
                 if (resData) {
                     setGameState('won');
-                    setFoundWords([...data.themeWords.map(t => t.word), data.spangram.word]);
-                    setFoundPaths([...data.themeWords.map(t => t.coords), data.spangram.coords]);
+                    setFoundWords([...data.themeWords.map((t: any) => t.word), data.spangram.word]);
+                    setFoundPaths([...data.themeWords.map((t: any) => t.coords), data.spangram.coords]);
                 } else {
                     if (stateData) {
                         const words = stateData.state_json.foundWords || [];

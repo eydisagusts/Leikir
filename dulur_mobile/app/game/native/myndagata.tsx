@@ -4,9 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
-import { MobileGameLayout } from '@/components/MobileGameLayout';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -110,6 +107,7 @@ export default function NativeMyndagata() {
                 console.error("Init Error", error);
                 setGameState('error');
             }
+        }
         init();
     }, []);
 
@@ -407,7 +405,7 @@ export default function NativeMyndagata() {
                     </View>
                 </View>
 
-            </ScrollView>
+            </View>
 
             {showFlyXp && (
                 <Animated.View style={[{ position: 'absolute', top: Dimensions.get('window').height * 0.6, left: 0, right: 0, alignItems: 'center', zIndex: 100 }, xpFloatingStyle]} pointerEvents="none">

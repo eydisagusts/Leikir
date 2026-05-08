@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Switch, TouchableOpacity, TextInput, Alert, ScrollView, Linking } from 'react-native';
+import { View, Text, Switch, TouchableOpacity, TextInput, Alert, ScrollView, Linking, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';

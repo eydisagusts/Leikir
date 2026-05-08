@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -329,13 +329,11 @@ export default function NativeTengingar() {
             <NativeGameEndModal
                 gameTitle="Tengingar"
                 visible={gameState !== 'playing' && isFreshGameOver}
-                gameState={gameState}
+                gameState={gameState as "won" | "lost"}
                 xpEarned={earnedXp}
                 winTitle={gameState === 'won' ? 'Vel gert!' : 'Leik lokið'}
                 winDesc={gameState === 'won' ? 'Þú fannst allar tengingarnar!' : 'Þú kláraðir allar tilraunir þínar.'}
                 onContinue={handleCloseModal}
-                primaryButtonText="Deila niðurstöðu"
-                onPrimaryAction={handleShare}
             />
 
             {toast && (

@@ -341,13 +341,11 @@ export default function NativeLitakodi() {
             <NativeGameEndModal
                 gameTitle="Litakóða"
                 visible={gameState !== 'playing' && isFreshGameOver}
-                gameState={gameState}
+                gameState={gameState as "won" | "lost"}
                 xpEarned={earnedXp}
                 winTitle={gameState === 'won' ? 'Vel gert!' : 'Leik lokið'}
                 winDesc={gameState === 'won' ? `Kóðinn var brotinn í ${currentRowIndex + 1} tilraunum!` : 'Þér mistókst að brjóta kóðann.'}
                 onContinue={handleCloseModal}
-                primaryButtonText="Deila niðurstöðu"
-                onPrimaryAction={handleShare}
             />
 
             {showFlyXp && earnedXp !== null && earnedXp > 0 && (

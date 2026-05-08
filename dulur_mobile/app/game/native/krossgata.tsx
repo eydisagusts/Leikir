@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 const { width } = Dimensions.get('window');
@@ -443,8 +444,6 @@ export default function NativeKrossgata() {
                     winTitle="Vel gert!"
                     winDesc="Krossgáta leyst."
                     onContinue={handleCloseModal}
-                    primaryButtonText="Deila niðurstöðu"
-                    onPrimaryAction={handleShare}
                 />
 
                 {/* Clue Banner */}
