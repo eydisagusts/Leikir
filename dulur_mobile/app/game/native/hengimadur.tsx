@@ -9,6 +9,7 @@ import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 const { width } = Dimensions.get('window');
@@ -121,7 +122,11 @@ export default function NativeHengimadur() {
 
             if (resData) {
                 setGameState(resData.won ? 'won' : 'lost');
-                setGuessedLetters(loadedGuesses.length > 0 ? loadedGuesses : Array.from(new Set(data.targetWord.split(''))));
+                if (resData.won) {
+                    setGuessedLetters(Array.from(new Set(data.targetWord.split(''))));
+                } else {
+                    setGuessedLetters(loadedGuesses);
+                }
                 setMistakes(resData.metadata?.errors || 0);
             } else {
                 setGameState('playing');
@@ -205,8 +210,13 @@ export default function NativeHengimadur() {
         setEarnedXp(xpReward);
         setTimeout(() => setIsFreshGameOver(true), 1000);
 
+        let elapsed = 60;
+        const date = new Date().toLocaleDateString('en-CA');
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_hengimadur_${level}_${date}`);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
+
         await supabase.from('game_results').insert({
-            time_taken_seconds: 60,
+            time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: `hengimadur_${level}`,
             score: xpReward,

@@ -339,6 +339,7 @@ export default function NativeKrossgata() {
             }
         }
 
+        DeviceEventEmitter.emit('stop-timer');
         setGameState('won');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -348,8 +349,13 @@ export default function NativeKrossgata() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        let elapsed = 120;
+        const date = new Date().toLocaleDateString('en-CA');
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_krossgata_${date}`);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 120;
+
         await supabase.from('game_results').insert({
-            time_taken_seconds: 120, // stub
+            time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: 'krossgata',
             score: 100,

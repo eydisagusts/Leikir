@@ -7,6 +7,10 @@ import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
+import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
@@ -106,9 +110,14 @@ export default function NativeMyndagata() {
                 console.error("Init Error", error);
                 setGameState('error');
             }
-        }
         init();
     }, []);
+
+    useEffect(() => {
+        if (gameState === 'playing') {
+            setTimeout(() => DeviceEventEmitter.emit('start-timer'), 500);
+        }
+    }, [gameState]);
 
     const saveStateToDb = async (currentGrid: CellState[][]) => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -133,6 +142,7 @@ export default function NativeMyndagata() {
         }
 
         if (won) {
+            DeviceEventEmitter.emit('stop-timer');
             setGameState('won');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             
@@ -142,6 +152,11 @@ export default function NativeMyndagata() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
                 try {
+                    let elapsed = 60;
+                    const date = new Date().toLocaleDateString('en-CA');
+                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_myndagata_${date}`);
+                    if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
+
                     const res = await fetch(`${API_URL}/api/mobile/myndagata`, {
                         method: 'POST',
                         headers: {
@@ -151,7 +166,7 @@ export default function NativeMyndagata() {
                         body: JSON.stringify({
                             action: 'save',
                             won: true,
-                            timeTakenSeconds: 60
+                            timeTakenSeconds: elapsed
                         })
                     });
                     const d = await res.json();
@@ -266,8 +281,9 @@ export default function NativeMyndagata() {
                 gameTitle="Myndagáta" 
                 isGameOver={gameState !== 'playing'}
                 onBack={() => router.replace('/(tabs)')}
+                scrollEnabled={false}
             >
-            <ScrollView scrollEnabled={false} className="flex-1" contentContainerStyle={{ alignItems: 'center', paddingBottom: 40, paddingTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>
+            <View className="flex-1 w-full items-center justify-center pt-2">
                 
                 <View className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 w-[95%]">
                     

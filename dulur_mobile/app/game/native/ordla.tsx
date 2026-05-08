@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { useAnimatedStyle, withTiming, withSequence, withDelay, interpolate, useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withTiming, withSequence, withDelay, interpolate, useSharedValue, Easing, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
@@ -306,6 +307,7 @@ export default function NativeOrdla() {
     }
 
     const syncTrueResult = async (won: boolean, guessList: Guess[]) => {
+        DeviceEventEmitter.emit('stop-timer');
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -315,8 +317,13 @@ export default function NativeOrdla() {
             xpReward = Math.max(100, Math.min(220, 100 + (80 - penalty)));
         }
 
+        let elapsed = 60;
+        const date = new Date().toLocaleDateString('en-CA');
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_ordla_${wordLength}_${date}`);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
+
         await supabase.from('game_results').insert({
-            time_taken_seconds: 60,
+            time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: `ordla_${wordLength}`,
             score: xpReward,

@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, withRepeat } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, Easing } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
@@ -327,8 +328,13 @@ export default function NativeSudoku() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        let elapsed = 300;
+        const date = new Date().toLocaleDateString('en-CA');
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_sudoku_${difficulty}_${date}`);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 300;
+
         await supabase.from('game_results').insert({
-            time_taken_seconds: 300,
+            time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: `sudoku_${difficulty}`,
             score: 100, // Easy default

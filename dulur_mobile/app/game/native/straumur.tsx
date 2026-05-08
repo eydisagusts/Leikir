@@ -8,6 +8,7 @@ import { Share } from 'react-native';
 import Svg, { Polyline, Circle } from 'react-native-svg';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
@@ -355,8 +356,13 @@ export default function NativeStraumur() {
             setGameState('won');
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+                let elapsed = 120;
+                const date = new Date().toLocaleDateString('en-CA');
+                const savedTime = await AsyncStorage.getItem(`timer_${user.id}_straumur_${date}`);
+                if (savedTime) elapsed = parseInt(savedTime, 10) || 120;
+
                 await supabase.from('game_results').insert({
-                    time_taken_seconds: 120,
+                    time_taken_seconds: elapsed,
                     user_id: user.id,
                     game_type: 'straumur',
                     score: 100,

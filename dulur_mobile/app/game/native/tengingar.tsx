@@ -8,6 +8,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, w
 import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 
@@ -255,13 +256,19 @@ export default function NativeTengingar() {
     };
 
     const syncTrueResult = async (won: boolean, numMistakes: number) => {
+        DeviceEventEmitter.emit('stop-timer');
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
         let xpReward = won ? 150 - (numMistakes * 10) : 50;
 
+        let elapsed = 60;
+        const date = new Date().toLocaleDateString('en-CA');
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_tengingar_${date}`);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
+
         await supabase.from('game_results').insert({
-            time_taken_seconds: 60,
+            time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: 'tengingar',
             score: xpReward,

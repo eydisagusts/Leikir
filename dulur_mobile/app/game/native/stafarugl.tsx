@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 
@@ -277,14 +278,21 @@ export default function NativeStafarugl() {
     }
 
     const syncTrueResult = async () => {
+        DeviceEventEmitter.emit('stop-timer');
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
         const xpReward = 100;
         setEarnedXp(xpReward);
         setTimeout(() => setIsFreshGameOver(true), 1000);
+
+        let elapsed = 60;
+        const date = new Date().toLocaleDateString('en-CA');
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_stafarugl_${date}`);
+        if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
+
         await supabase.from('game_results').insert({
-            time_taken_seconds: 60,
+            time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: `stafarugl`,
             score: xpReward,

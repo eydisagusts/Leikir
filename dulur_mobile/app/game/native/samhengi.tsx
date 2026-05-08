@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
@@ -98,7 +99,16 @@ export default function NativeSamhengi() {
                     if (updatedDate === today) {
                         setGuesses(stateRow.state_json.guesses || []);
                         setHintsUsed(stateRow.state_json.hintsUsed || 0);
-                        setGameState('playing');
+                        const hasWon = stateRow.state_json.guesses?.some((g: Guess) => g.rank === 1);
+                        if (hasWon) {
+                            if (stateRow.state_json.givenUp) {
+                                setGameState('given_up');
+                            } else {
+                                setGameState('won');
+                            }
+                        } else {
+                            setGameState('playing');
+                        }
                     } else {
                         // Stale state
                         setGameState('playing');
@@ -111,9 +121,14 @@ export default function NativeSamhengi() {
                 console.error("Init Error", error);
                 setGameState('error');
             }
-        }
         init();
     }, []);
+
+    useEffect(() => {
+        if (gameState === 'playing') {
+            setTimeout(() => DeviceEventEmitter.emit('start-timer'), 500);
+        }
+    }, [gameState]);
 
     // Save state debounced
     useEffect(() => {
@@ -124,13 +139,13 @@ export default function NativeSamhengi() {
         return () => clearTimeout(timer);
     }, [guesses, hintsUsed]);
 
-    const saveStateToDb = async (currentGuesses?: Guess[]) => {
+    const saveStateToDb = async (currentGuesses?: Guess[], givenUp: boolean = false) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
         await supabase.from('game_states').upsert({
             user_id: session.user.id,
             game_type: 'samhengi',
-            state_json: { guesses: currentGuesses || guesses, hintsUsed, puzzleId: puzzleData.id },
+            state_json: { guesses: currentGuesses || guesses, hintsUsed, puzzleId: puzzleData.id, givenUp },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
     };
@@ -157,6 +172,7 @@ export default function NativeSamhengi() {
         setGuesses(newGuesses);
 
         if (rank === 1) {
+            DeviceEventEmitter.emit('stop-timer');
             setGameState('won');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             
@@ -168,6 +184,11 @@ export default function NativeSamhengi() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
                 try {
+                    let elapsed = 60;
+                    const date = new Date().toLocaleDateString('en-CA');
+                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_samhengi_${date}`);
+                    if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
+
                     const res = await fetch(`${API_URL}/api/mobile/samhengi`, {
                         method: 'POST',
                         headers: {
@@ -179,7 +200,7 @@ export default function NativeSamhengi() {
                             won: true,
                             guessesCount: newGuesses.length,
                             hintsUsed,
-                            timeTakenSeconds: 60 // placeholder native time
+                            timeTakenSeconds: elapsed
                         })
                     });
                     const d = await res.json();
@@ -258,11 +279,17 @@ export default function NativeSamhengi() {
                             setGuesses(newGuesses);
                             setGameState('given_up');
                             setEarnedXp(0);
-                            saveStateToDb(newGuesses);
+                            DeviceEventEmitter.emit('stop-timer');
+                            saveStateToDb(newGuesses, true);
 
                             const { data: { session } } = await supabase.auth.getSession();
                             if (session?.user) {
                                 try {
+                                    let elapsed = 60;
+                                    const date = new Date().toLocaleDateString('en-CA');
+                                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_samhengi_${date}`);
+                                    if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
+
                                     await fetch(`${API_URL}/api/mobile/samhengi`, {
                                         method: 'POST',
                                         headers: {
@@ -274,7 +301,7 @@ export default function NativeSamhengi() {
                                             won: false,
                                             guessesCount: newGuesses.length,
                                             hintsUsed,
-                                            timeTakenSeconds: 60
+                                            timeTakenSeconds: elapsed
                                         })
                                     });
                                 } catch (e) { }
