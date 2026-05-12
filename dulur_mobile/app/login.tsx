@@ -128,9 +128,16 @@ export default function LoginScreen() {
                value={password}
                onChangeText={setPassword}
                secureTextEntry
-               className="w-full bg-white border border-slate-200 rounded-2xl h-14 px-4 mb-6 font-sans text-lg font-semibold shadow-sm text-[#1e1b4b]"
+               className="w-full bg-white border border-slate-200 rounded-2xl h-14 px-4 mb-2 font-sans text-lg font-semibold shadow-sm text-[#1e1b4b]"
                style={{ paddingVertical: 0, margin: 0, includeFontPadding: false }}
             />
+            
+            <View className="w-full flex-row justify-end mb-6">
+                <TouchableOpacity onPress={() => Linking.openURL('https://dulur.is/login')}>
+                    <Text className="text-slate-500 font-sans font-semibold text-sm">Gleymt lykilorð?</Text>
+                </TouchableOpacity>
+            </View>
+
             <TouchableOpacity 
                className="w-full bg-[#1c1917] p-4 rounded-xl items-center shadow-lg"
                onPress={handleLogin}

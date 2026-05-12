@@ -239,8 +239,14 @@ export default function NativeSamhengi() {
         let bestRank = -1;
         let minDiff = Infinity;
 
-        for (const [word, rank] of Object.entries((puzzleData as any).ranks)) {
-            if (typeof rank === 'number' && rank > 1 && !guesses.some(g => g.word === word) && word === word.toUpperCase() && /^[A-ZÁÐÉÍÓÚÝÞÆÖ]+$/.test(word)) {
+        const isValidWord = (w: string) => {
+            return !w.includes(' ') && !w.includes('-') && !w.includes('.') && !w.includes('\'') && !/\d/.test(w) && w.length > 2;
+        };
+
+        const ranksObj = (puzzleData as any).ranks;
+        for (const word in ranksObj) {
+            const rank = ranksObj[word];
+            if (typeof rank === 'number' && rank > 1 && !guesses.some(g => g.word === word) && isValidWord(word)) {
                 const diff = Math.abs(rank - targetRank);
                 if (diff < minDiff) {
                     minDiff = diff;

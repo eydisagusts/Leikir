@@ -9,7 +9,7 @@ import { GataWidget } from '@/components/GataWidget';
 
 const { width } = Dimensions.get('window');
 
-const GAMES = [
+const BASE_GAMES = [
     { id: 'ordla', name: 'Orðla', desc: 'Finndu orð dagsins í minna en sex tilraunum.', iconType: 'ordla', badge: null },
     { id: 'hengimadur', name: 'Hengimaður', desc: 'Bjargaðu karlinum úr snörunni með því að giska á stafina í orðinu.', iconType: 'hengimadur', badge: null },
     { id: 'sudoku', name: 'Sudoku', desc: 'Settu tölustafina í réttan reit.', iconType: 'sudoku', badge: null },
@@ -24,6 +24,14 @@ const GAMES = [
     { id: 'litakodi', name: 'Litakóði', desc: 'Reyndu að finna réttan litakóða í 6 eða færri tilraunum.', iconType: 'litakodi', badge: 'ÁSKRIFT' },
     { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null }
 ];
+
+const GAMES = __DEV__ 
+    ? [
+        ...BASE_GAMES,
+        { id: '2048', name: '2048', desc: 'Strjúktu til að færa kubbana og ná 2048!', iconType: '2048', badge: null },
+        { id: 'flaedi', name: 'Flæði', desc: 'Tengdu saman eins liti án þess að línur krossist.', iconType: 'flaedi', badge: null }
+      ]
+    : BASE_GAMES;
 
 const GameGraphic = React.memo(({ type }: { type: string }) => {
     if (type === 'ordla') {
@@ -298,6 +306,32 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
                         <View key={i} className="w-[45%] h-[45%] bg-white rounded flex items-center justify-center border border-black/5 shadow-sm" style={{ elevation: 1 }}>
                             {i === 1 || i === 2 ? <Ionicons name="star" size={16} color="#0EA5E9" /> : null}
                         </View>
+                    ))}
+                </View>
+            </View>
+        );
+    }
+
+    if (type === '2048') {
+        return (
+            <View className="absolute inset-0 bg-[#bbada0] items-center justify-center">
+                <View className="w-[65%] aspect-square flex-row flex-wrap justify-between p-1 bg-[#a6998d] rounded-md" style={{ gap: 2 }}>
+                    {[2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 0, 0, 0, 0, 0].map((val, i) => (
+                        <View key={i} className="rounded-[2px] items-center justify-center" style={{ width: '22%', aspectRatio: 1, backgroundColor: val > 0 ? '#f2b179' : '#cdc1b4' }}>
+                            {val > 0 && <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 6 }}>{val}</Text>}
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
+    }
+
+    if (type === 'flaedi') {
+        return (
+            <View className="absolute inset-0 bg-[#0f172a] items-center justify-center">
+                <View className="w-[65%] aspect-square flex-row flex-wrap justify-between p-1 bg-[#1e293b] rounded-md border-2 border-[#334155]" style={{ gap: 1 }}>
+                    {Array.from({ length: 16 }).map((_, i) => (
+                        <View key={i} className="border border-[#334155]/50" style={{ width: '23%', aspectRatio: 1 }} />
                     ))}
                 </View>
             </View>
