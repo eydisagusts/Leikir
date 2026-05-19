@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
-import Svg, { Path, Circle, Polyline } from 'react-native-svg';
+import Svg, { Path, Circle, Polyline, Rect, Text as SvgText, G } from 'react-native-svg';
 import { GataWidget } from '@/components/GataWidget';
 
 const { width } = Dimensions.get('window');
@@ -22,16 +22,12 @@ const BASE_GAMES = [
     { id: 'stafarugl', name: 'Stafarugl', desc: 'Finndu orðin í stafaruglinu.', iconType: 'stafarugl', badge: 'ÁSKRIFT' },
     { id: 'kviss', name: 'Kviss', desc: 'Svaraðu fimm spennandi spurningum dagsins.', iconType: 'kviss', badge: 'ÁSKRIFT' },
     { id: 'litakodi', name: 'Litakóði', desc: 'Reyndu að finna réttan litakóða í 6 eða færri tilraunum.', iconType: 'litakodi', badge: 'ÁSKRIFT' },
-    { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null }
+    { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null },
+    { id: 'krossreikningur', name: 'Krossreikningur', desc: 'Leystu stærðfræðiþrautir í kross.', iconType: 'krossreikningur', badge: 'ÁSKRIFT' },
+    { id: 'dulmal', name: 'Dulmál', desc: 'Notaðu rökvísi til að brjóta dulmálið og finna orðið.', iconType: 'dulmal', badge: 'VÆNTANLEGT' }
 ];
 
-const GAMES = __DEV__ 
-    ? [
-        ...BASE_GAMES,
-        { id: '2048', name: '2048', desc: 'Strjúktu til að færa kubbana og ná 2048!', iconType: '2048', badge: null },
-        { id: 'flaedi', name: 'Flæði', desc: 'Tengdu saman eins liti án þess að línur krossist.', iconType: 'flaedi', badge: null }
-      ]
-    : BASE_GAMES;
+const GAMES = BASE_GAMES;
 
 const GameGraphic = React.memo(({ type }: { type: string }) => {
     if (type === 'ordla') {
@@ -338,6 +334,70 @@ const GameGraphic = React.memo(({ type }: { type: string }) => {
         );
     }
 
+    if (type === 'krossreikningur') {
+        const C = 34; // Cell size
+        return (
+            <View className="absolute inset-0 bg-[#E8F0FE] items-center justify-center">
+                <View className="shadow-lg" style={{ transform: [{ rotate: '-2deg' }], width: C*5, height: C*3 }}>
+                    <Svg width="100%" height="100%" viewBox={`0 0 ${C*5} ${C*3}`}>
+                        <G>
+                            {/* Row 1 */}
+                            <Rect x={0} y={0} width={C} height={C} fill="white" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C/2} y={C/2 + 5} fontSize={14} fontWeight="bold" fill="#10b981" textAnchor="middle">8</SvgText>
+                            
+                            <Rect x={C} y={0} width={C} height={C} fill="#FFF8E7" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C + C/2} y={C/2 + 5} fontSize={14} fontWeight="bold" fill="#0f172a" textAnchor="middle">+</SvgText>
+                            
+                            <Rect x={C*2} y={0} width={C} height={C} fill="white" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C*2 + C/2} y={C/2 + 5} fontSize={14} fontWeight="bold" fill="#10b981" textAnchor="middle">4</SvgText>
+                            
+                            <Rect x={C*3} y={0} width={C} height={C} fill="#FFF8E7" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C*3 + C/2} y={C/2 + 5} fontSize={14} fontWeight="bold" fill="#0f172a" textAnchor="middle">=</SvgText>
+                            
+                            <Rect x={C*4} y={0} width={C} height={C} fill="#FFF8E7" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C*4 + C/2} y={C/2 + 5} fontSize={14} fontWeight="bold" fill="#0f172a" textAnchor="middle">12</SvgText>
+
+                            {/* Row 2 */}
+                            <Rect x={0} y={C} width={C} height={C} fill="#FFF8E7" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C/2} y={C + C/2 + 5} fontSize={14} fontWeight="bold" fill="#0f172a" textAnchor="middle">-</SvgText>
+                            
+                            <Rect x={C*2} y={C} width={C} height={C} fill="#FFF8E7" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C*2 + C/2} y={C + C/2 + 5} fontSize={14} fontWeight="bold" fill="#0f172a" textAnchor="middle">-</SvgText>
+
+                            {/* Row 3 */}
+                            <Rect x={0} y={C*2} width={C} height={C} fill="white" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C/2} y={C*2 + C/2 + 5} fontSize={14} fontWeight="bold" fill="#10b981" textAnchor="middle">3</SvgText>
+                            
+                            <Rect x={C} y={C*2} width={C} height={C} fill="#FFF8E7" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C + C/2} y={C*2 + C/2 + 5} fontSize={14} fontWeight="bold" fill="#0f172a" textAnchor="middle">=</SvgText>
+                            
+                            <Rect x={C*2} y={C*2} width={C} height={C} fill="white" stroke="#1e293b" strokeWidth={1} />
+                            <SvgText x={C*2 + C/2} y={C*2 + C/2 + 5} fontSize={14} fontWeight="bold" fill="#10b981" textAnchor="middle">2</SvgText>
+                        </G>
+                    </Svg>
+                </View>
+            </View>
+        );
+    }
+
+    if (type === 'dulmal') {
+        return (
+            <View className="absolute inset-0 bg-[#2A3441] items-center justify-center">
+                <View className="w-[70%] aspect-[4/3] max-w-[110px] bg-[#fdfbf7] rounded-md shadow border-2 border-[#1E2631]/20 flex-col items-center justify-center p-2 gap-1.5">
+                    <View className="flex-row gap-1">
+                        <View className="items-center"><Text className="text-[7px] font-mono text-[#4A148C] font-bold">14</Text><View className="w-4 h-5 bg-white border border-gray-300 shadow-sm items-center justify-center rounded-sm"><Text className="text-[10px] font-bold font-serif">H</Text></View></View>
+                        <View className="items-center"><Text className="text-[7px] font-mono text-[#4A148C] font-bold">22</Text><View className="w-4 h-5 bg-white border border-gray-300 shadow-sm items-center justify-center rounded-sm"><Text className="text-[10px] font-bold font-serif">E</Text></View></View>
+                        <View className="items-center"><Text className="text-[7px] font-mono text-gray-400 font-bold">07</Text><View className="w-4 h-5 bg-[#f0f0f0] border border-gray-300 shadow-sm items-center justify-center rounded-sm"><Text className="text-[10px] font-bold font-serif text-transparent">X</Text></View></View>
+                    </View>
+                    <View className="flex-row gap-1">
+                        <View className="items-center"><Text className="text-[7px] font-mono text-gray-400 font-bold">07</Text><View className="w-4 h-5 bg-[#f0f0f0] border border-gray-300 shadow-sm items-center justify-center rounded-sm"><Text className="text-[10px] font-bold font-serif text-transparent">X</Text></View></View>
+                        <View className="items-center"><Text className="text-[7px] font-mono text-[#4A148C] font-bold">22</Text><View className="w-4 h-5 bg-white border border-gray-300 shadow-sm items-center justify-center rounded-sm"><Text className="text-[10px] font-bold font-serif">E</Text></View></View>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
     return <View className="absolute inset-0 bg-zinc-200" />;
 });
 
@@ -351,7 +411,7 @@ const GameCard = React.memo(({
     isSubscribed: boolean,
     onPress: (id: string) => void
 }) => {
-    const showBadge = game.badge && !isSubscribed;
+    const showBadge = game.badge && (!isSubscribed || game.badge === 'VÆNTANLEGT');
     const cardWidth = width >= 768 ? '31%' : '48%';
     
     return (
@@ -374,8 +434,8 @@ const GameCard = React.memo(({
                 <GameGraphic type={game.iconType} />
 
                 {showBadge && (
-                    <View className="absolute top-3 right-3 bg-indigo-950/90 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5" style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
-                        <Ionicons name="lock-closed" size={10} color="#EAB308" />
+                    <View className={`absolute top-3 right-3 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5 ${game.badge === 'VÆNTANLEGT' ? 'bg-indigo-600/90' : 'bg-indigo-950/90'}`} style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
+                        {game.badge !== 'VÆNTANLEGT' && <Ionicons name="lock-closed" size={10} color="#EAB308" />}
                         <Text className="text-[9px] font-black uppercase text-white tracking-widest leading-none">{game.badge}</Text>
                     </View>
                 )}
@@ -418,6 +478,15 @@ export default function HomeHubScreen() {
 
     const handleGamePress = React.useCallback((id: string) => {
         const game = GAMES.find(g => g.id === id);
+        if (game?.badge === 'VÆNTANLEGT') {
+            Alert.alert(
+                'Væntanlegt',
+                'Þessi leikur er ekki alveg tilbúinn ennþá. Kíktu aftur síðar!',
+                [{ text: 'Loka', style: 'cancel' }]
+            );
+            return;
+        }
+        
         if (game?.badge === 'ÁSKRIFT' && !isSubscribed) {
             Alert.alert(
                 'Áskrift nauðsynleg',

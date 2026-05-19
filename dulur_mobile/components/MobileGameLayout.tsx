@@ -84,7 +84,15 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
             // Re-fetch leaderboard with slight delay to ensure DB triggers have finished
             setTimeout(() => fetchGameData(), 1000);
         });
-        return () => sub.remove();
+
+        const sub2 = DeviceEventEmitter.addListener('refresh-stats', () => {
+            fetchGameData();
+        });
+
+        return () => {
+            sub.remove();
+            sub2.remove();
+        };
     }, [fetchGameData, xpScale]);
 
     useEffect(() => {
@@ -354,6 +362,17 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                             </TouchableOpacity>
                         </View>
                         <ScrollView showsVerticalScrollIndicator={false} className="max-h-[400px]">
+                            {gameId.startsWith('krossreikningur') && (
+                                <View className="pb-4">
+                                    <Text className="text-gray-600 font-medium mb-4 text-base">Leystu dæmin með því að setja inn tölurnar sem vantar.</Text>
+                                    <View className="space-y-3 mb-6">
+                                        <Text className="text-gray-600 text-sm">• Dragðu eða smelltu á tölurnar að neðan til að fylla í auðu reitina.</Text>
+                                        <Text className="text-gray-600 text-sm">• Dæmin verða að ganga upp bæði lárétt og lóðrétt.</Text>
+                                        <Text className="text-gray-600 text-sm">• Dæmin eru reiknuð frá vinstri til hægri, og ofan frá og niður.</Text>
+                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Stig:</Text> Þú færð 100 stig (XP) fyrir að vinna leikinn, og meira fyrir stærri borð.</Text>
+                                    </View>
+                                </View>
+                            )}
                             {gameId.startsWith('ordla') && (
                                 <View className="pb-4">
                                     <Text className="text-gray-600 font-medium mb-4 text-base">Giskaðu á orðið í 6 tilraunum.</Text>

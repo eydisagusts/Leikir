@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, Dimensions, Share, Animated as RNAnimated } from 'react-native';
-import { Animated } from 'react-native';
+import { Animated, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface NativeGameEndModalProps {
@@ -37,6 +37,7 @@ export const NativeGameEndModal: React.FC<NativeGameEndModalProps> = ({
                 Animated.spring(scale, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }),
                 Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true })
             ]).start();
+            DeviceEventEmitter.emit('refresh-stats');
         } else {
             scale.setValue(0.8);
             opacity.setValue(0);
