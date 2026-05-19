@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
@@ -54,46 +54,48 @@ export default function NativeKrossreikningur() {
     
     const [allPuzzles, setAllPuzzles] = useState<LevelData | null>(null);
 
-    const initGame = async () => {
+    const initGame = async (diff: 'easy' | 'medium' | 'hard') => {
         setGameState('loading');
         try {
             const today = new Date().toISOString().split('T')[0];
             const sessionPromise = supabase.auth.getSession();
-            const apiPromise = fetch(`${API_URL}/api/mobile/krossreikningur/init`).then(res => res.json());
+            
+            let puzzles = allPuzzles;
+            if (!puzzles) {
+                puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init`).then(res => res.json());
+                setAllPuzzles(puzzles);
+            }
 
             const { data: { session } } = await sessionPromise;
             const user = session?.user;
 
             const dbPromises = user ? Promise.all([
-                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `krossreikningur`).maybeSingle(),
+                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `krossreikningur_${diff}`).maybeSingle(),
                 supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `krossreikningur`).gte('played_at', `${today}T00:00:00Z`).maybeSingle()
             ]) : Promise.resolve([{ data: null }, { data: null }]);
 
-            const [puzzles, [stateRes, resultRes]] = await Promise.all([apiPromise, dbPromises]);
-            setAllPuzzles(puzzles);
+            const [stateRes, resultRes] = await dbPromises;
 
-            let diffToLoad = difficulty;
-            let loadedGrid = puzzles[diffToLoad].grid;
-            let loadedBank = puzzles[diffToLoad].answerBank.map((val: number, idx: number) => ({ id: idx, val, used: false }));
+            let loadedGrid = puzzles![diff].grid;
+            let loadedBank = puzzles![diff].answerBank.map((val: number, idx: number) => ({ id: idx, val, used: false }));
 
             if (user) {
                 const existingResult = resultRes.data;
                 const existingState = stateRes.data;
 
-                if (existingResult?.won) {
+                // Check if they won this specific difficulty today
+                const diffResult = await supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `krossreikningur`).eq('metadata->>difficulty', diff).gte('played_at', `${today}T00:00:00Z`).maybeSingle();
+
+                if (diffResult.data?.won) {
                     setGameState('won');
                 } else {
                     setGameState('playing');
                     if (existingState && existingState.updated_at.startsWith(today)) {
                         const saved = existingState.state_json;
-                        if (saved.difficulty) {
-                            diffToLoad = saved.difficulty;
-                            setDifficulty(diffToLoad);
-                        }
                         if (saved.grid) loadedGrid = saved.grid;
                         if (saved.answerBank) loadedBank = saved.answerBank;
-                        setTimeout(() => DeviceEventEmitter.emit('start-timer'), 500);
                     }
+                    setTimeout(() => DeviceEventEmitter.emit('start-timer'), 500);
                 }
             } else {
                 setGameState('playing');
@@ -109,30 +111,15 @@ export default function NativeKrossreikningur() {
     };
 
     useEffect(() => {
-        initGame();
-    }, []);
+        initGame(difficulty);
+    }, [difficulty]);
 
-    const changeDifficulty = async (newDiff: 'easy' | 'medium' | 'hard') => {
-        if (difficulty === newDiff || !allPuzzles || gameState === 'won') return;
+    const changeDifficulty = (newDiff: 'easy' | 'medium' | 'hard') => {
+        if (difficulty === newDiff || gameState === 'won') return;
+        setGameState('loading');
+        setGrid([]);
+        setAnswerBank([]);
         setDifficulty(newDiff);
-        const puz = allPuzzles[newDiff];
-        setGrid(puz.grid);
-        setAnswerBank(puz.answerBank.map((val: number, idx: number) => ({ id: idx, val, used: false })));
-        setSelectedBankId(null);
-        setSelectedCell(null);
-        
-        DeviceEventEmitter.emit('clear-timer');
-        DeviceEventEmitter.emit('start-timer');
-
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            await supabase.from('game_states').upsert({
-                user_id: user.id,
-                game_type: 'krossreikningur',
-                state_json: { grid: puz.grid, answerBank: puz.answerBank.map((val: number, idx: number) => ({ id: idx, val, used: false })), difficulty: newDiff },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id, game_type' });
-        }
     };
 
     const handleBankTap = (id: number) => {
@@ -231,7 +218,7 @@ export default function NativeKrossreikningur() {
         if (!user) return;
         await supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: 'krossreikningur',
+            game_type: `krossreikningur_${difficulty}`,
             state_json: { grid: currentGrid, answerBank: currentBank, difficulty },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -379,7 +366,8 @@ export default function NativeKrossreikningur() {
 
     return (
         <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
-            <MobileGameLayout gameId="krossreikningur" gameTitle="Krossreikningur" isGameOver={gameState === 'won'} onBack={() => router.back()}>
+            <Stack.Screen options={{ headerShown: false }} />
+            <MobileGameLayout gameId={`krossreikningur_${difficulty}`} gameTitle="Krossreikningur" isGameOver={gameState === 'won'} onBack={() => router.back()}>
                 {gameState === 'loading' ? (
                     <View className="flex-1 items-center justify-center p-6 text-center min-h-[300px]">
                         <ActivityIndicator size="large" color="#538D4E" />
@@ -405,7 +393,7 @@ export default function NativeKrossreikningur() {
                                     className={`px-4 py-2 rounded-full ${difficulty === level ? 'bg-white shadow-sm border border-gray-100' : ''}`}
                                 >
                                     <Text className={`font-bold text-sm capitalize ${difficulty === level ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>
-                                        {level === 'easy' ? 'Létt' : level === 'medium' ? 'Miðlungs' : 'Erfitt'}
+                                        {level === 'easy' ? 'Auðvelt' : level === 'medium' ? 'Miðlungs' : 'Erfitt'}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -536,13 +524,41 @@ export default function NativeKrossreikningur() {
                             </View>
                         </View>
 
-                        <View className="mt-8 mb-12 w-full max-w-xs mx-auto">
+                        <View className="mt-8 mb-12 w-full max-w-sm mx-auto flex-row justify-center gap-2 px-4">
                             <TouchableOpacity 
                                 onPress={() => validateBoard()}
-                                className="bg-[#10b981] w-full py-4 rounded-full shadow-md items-center flex-row justify-center gap-2"
+                                className="bg-[#1A73E8] flex-1 py-3.5 rounded-full shadow-md items-center justify-center opacity-95 active:opacity-100"
+                                disabled={answerBank.some(b => !b.used)}
+                                style={{ opacity: answerBank.some(b => !b.used) ? 0.5 : 1 }}
                             >
-                                <Ionicons name="checkmark-circle" size={20} color="white" />
-                                <Text className="text-white font-black text-lg">Yfirfara Borð</Text>
+                                <Text className="text-white font-black text-sm sm:text-base uppercase tracking-wider">Staðfesta</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    const newGrid = [...grid.map(row => [...row])];
+                                    const newBank = [...answerBank];
+                                    for (let r = 0; r < newGrid.length; r++) {
+                                        for (let c = 0; c < newGrid[r].length; c++) {
+                                            if (newGrid[r][c].type === 'number' && !newGrid[r][c].fixed) {
+                                                const val = newGrid[r][c].value;
+                                                newGrid[r][c] = { ...newGrid[r][c], type: 'empty', value: null };
+                                                const oldBankItem = newBank.find(b => b.val === val && b.used);
+                                                if (oldBankItem) oldBankItem.used = false;
+                                            }
+                                        }
+                                    }
+                                    setGrid(newGrid);
+                                    setAnswerBank(newBank);
+                                    setSelectedCell(null);
+                                    setSelectedBankId(null);
+                                    setErrorMsg(null);
+                                    saveState(newGrid, newBank);
+                                }}
+                                disabled={gameState !== 'playing'}
+                                className="bg-white border border-red-200 flex-1 py-3.5 rounded-full shadow-sm items-center justify-center active:bg-red-50"
+                            >
+                                <Text className="text-red-500 font-black text-sm sm:text-base uppercase tracking-wider">Hreinsa</Text>
                             </TouchableOpacity>
                         </View>
 
