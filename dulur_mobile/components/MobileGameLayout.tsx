@@ -47,11 +47,11 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 user ? supabase.from('profiles').select('xp').eq('id', user.id).single() : Promise.resolve({ data: null }),
                 user ? supabase.from('game_results').select('won, time_taken_seconds').eq('user_id', user.id).eq('game_type', gameId) : Promise.resolve({ data: null })
             ]);
-            
+
             if (leaderboardRes.error) {
                 console.log('Error fetching top3:', leaderboardRes.error);
             }
-            
+
             if (leaderboardRes.data) setTop3(leaderboardRes.data);
 
             if (profileRes.data) setTotalXp(profileRes.data.xp || 0);
@@ -73,12 +73,12 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
         const sub = DeviceEventEmitter.addListener('xp-earned', (earned: number) => {
             setTotalXp(prev => prev + earned);
             setXpBounce(true);
-            
+
             Animated.sequence([
                 Animated.timing(xpScale, { toValue: 1.3, duration: 150, useNativeDriver: true }),
                 Animated.timing(xpScale, { toValue: 1, duration: 250, useNativeDriver: true })
             ]).start();
-            
+
             setTimeout(() => setXpBounce(false), 800);
 
             // Re-fetch leaderboard with slight delay to ensure DB triggers have finished
@@ -112,7 +112,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
             const uid = data?.user?.id || 'anon';
             const date = new Date().toLocaleDateString('en-CA');
             const key = `timer_${uid}_${gameId}_${date}`;
-            
+
             if (isMounted) setTimerKey(key);
 
             const saved = await AsyncStorage.getItem(key);
@@ -205,7 +205,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
     return (
         <View style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
 
-            <ScrollView 
+            <ScrollView
                 contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -224,9 +224,9 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                             <Text className="text-[15px] font-bold text-slate-500 ml-1 tracking-wide">Leikir</Text>
                         </TouchableOpacity>
                     </View>
-                    
+
                     <View className="flex-[2] items-center">
-                        <Text 
+                        <Text
                             className="text-4xl sm:text-5xl font-black font-serif uppercase tracking-widest text-indigo-950 text-center"
                             numberOfLines={1}
                             adjustsFontSizeToFit
@@ -234,7 +234,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                             {gameTitle}
                         </Text>
                     </View>
-                    
+
                     <View className="flex-1 items-end justify-center">
                         {totalXp > 0 && (
                             <View pointerEvents="none">
@@ -283,7 +283,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                                 <Ionicons name="close" size={20} color="#1A1A1B" />
                             </TouchableOpacity>
                         </View>
-                        
+
                         <ScrollView showsVerticalScrollIndicator={false} className="w-full">
                             {/* User Statistics */}
                             <View className="w-full pb-4">
@@ -312,7 +312,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                                 <View className="w-full mt-2">
                                     <View className="flex-row items-center gap-2 border-b border-gray-200 pb-1.5 mb-3">
                                         <Ionicons name="trophy" size={16} color="#eab308" />
-                                        <Text className="font-black text-sm uppercase tracking-wider text-slate-900">Mánaðar Topp 3</Text>
+                                        <Text className="font-black text-sm uppercase tracking-wider text-slate-900">Topp 3 í þessum mánuði</Text>
                                     </View>
                                     <View className="flex-col gap-2">
                                         {top3.map((res, idx) => {
@@ -427,168 +427,171 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                                         <Text className="text-gray-600 text-sm">• Enginn stafur er notaður oftar en einu sinni.</Text>
                                         <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
                                             <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
-                                            <Text className="text-sm font-medium text-gray-600">Þú færð <Text className="font-bold text-[#1A1A1B]">100 XP</Text> fyrir að leysa þrautina. Ef þú notar vísbendingu lækkar stigið um 10 XP í h                            {gameId.startsWith('sudoku') && (
+                                            <Text className="text-sm font-medium text-gray-600">Þú færð <Text className="font-bold text-[#1A1A1B]">100 XP</Text> fyrir að leysa þrautina. Ef þú notar vísbendingu lækkar stigið um 10 XP í hvert skipti.</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+                            {gameId.startsWith('sudoku') && (
                                 <View className="pb-4">
                                     <View className="space-y-4 mb-6">
                                         <Text className="text-gray-600 text-sm">Fylltu alla 9x9 grindina miðað við þessar reglur:</Text>
-                                        <Text className="text-gray-600 text-sm">• Allar línur verða að innihalda tölurnar 1-9.</Text>
-                                        <Text className="text-gray-600 text-sm">• Allir dálkar verða að innihalda tölurnar 1-9.</Text>
-                                        <Text className="text-gray-600 text-sm">• Allir 3x3 kassar verða að innihalda tölurnar 1-9.</Text>
-                                        <Text className="text-gray-600 text-sm">Þú hefur <Text className="font-bold text-red-500">3 líf</Text> (hjörtu). Röng innsláttur kostar líf.</Text>
-                                        <Text className="text-gray-600 text-sm">Geturðu ekki leyst smáhluta? Notaðu <Text className="font-bold">Blýantinn</Text> til að hripa niður möguleika.</Text>
-                                        <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
-                                            <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Stigagjöf (XP):</Text>
-                                            <View className="flex-row justify-between">
-                                                <Text className="text-sm font-medium">Auðvelt:</Text>
-                                                <Text className="text-green-600 font-bold">+100 XP</Text>
-                                            </View>
-                                            <View className="flex-row justify-between mt-1">
-                                                <Text className="text-sm font-medium">Miðlungs:</Text>
-                                                <Text className="text-yellow-600 font-bold">+200 XP</Text>
-                                            </View>
-                                            <View className="flex-row justify-between mt-1">
-                                                <Text className="text-sm font-medium">Erfitt:</Text>
-                                                <Text className="text-orange-600 font-bold">+400 XP</Text>
-                                            </View>
-                                            <View className="flex-row justify-between mt-1">
-                                                <Text className="text-sm font-medium">Sérfræðingur:</Text>
-                                                <Text className="text-red-600 font-bold">+700 XP</Text>
-                                            </View>
-                                            <Text className="text-xs text-gray-500 mt-2 italic">*Hver vísbending kostar -20 XP.</Text>
+                                                        <Text className="text-gray-600 text-sm">• Allar línur verða að innihalda tölurnar 1-9.</Text>
+                                                        <Text className="text-gray-600 text-sm">• Allir dálkar verða að innihalda tölurnar 1-9.</Text>
+                                                        <Text className="text-gray-600 text-sm">• Allir 3x3 kassar verða að innihalda tölurnar 1-9.</Text>
+                                                        <Text className="text-gray-600 text-sm">Þú hefur <Text className="font-bold text-red-500">3 líf</Text> (hjörtu). Röng innsláttur kostar líf.</Text>
+                                                        <Text className="text-gray-600 text-sm">Geturðu ekki leyst smáhluta? Notaðu <Text className="font-bold">Blýantinn</Text> til að hripa niður möguleika.</Text>
+                                                        <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
+                                                            <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Stigagjöf (XP):</Text>
+                                                            <View className="flex-row justify-between">
+                                                                <Text className="text-sm font-medium">Auðvelt:</Text>
+                                                                <Text className="text-green-600 font-bold">+100 XP</Text>
+                                                            </View>
+                                                            <View className="flex-row justify-between mt-1">
+                                                                <Text className="text-sm font-medium">Miðlungs:</Text>
+                                                                <Text className="text-yellow-600 font-bold">+200 XP</Text>
+                                                            </View>
+                                                            <View className="flex-row justify-between mt-1">
+                                                                <Text className="text-sm font-medium">Erfitt:</Text>
+                                                                <Text className="text-orange-600 font-bold">+400 XP</Text>
+                                                            </View>
+                                                            <View className="flex-row justify-between mt-1">
+                                                                <Text className="text-sm font-medium">Sérfræðingur:</Text>
+                                                                <Text className="text-red-600 font-bold">+700 XP</Text>
+                                                            </View>
+                                                            <Text className="text-xs text-gray-500 mt-2 italic">*Hver vísbending kostar -20 XP.</Text>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            )}
+                                                {gameId.startsWith('hengimadur') && (
+                                                    <View className="pb-4">
+                                                        <Text className="text-gray-600 font-medium mb-4 text-base">Giskaðu á orðið staf fyrir staf.</Text>
+                                                        <View className="space-y-3 mb-6">
+                                                            <Text className="text-gray-600 text-sm">• Þú þarft að giska á alla réttu stafina í 6 tilraunum eða færri til að vinna.</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Stig:</Text> Þú færð 100 stig (XP) fyrir að vinna. Þú færð fleiri stig fyrir hærri erfiðleikastig: Miðlungs gefur +20, Erfitt gefur +40.</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Bónus stig:</Text> Ef þú vinnur leikinn í færri en 6 tilraunum færðu +10 stig fyrir hverja tilraun sem þú áttir eftir.</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Stig þrátt fyrir tap:</Text> Ef að þú tapar þá færðu samt +5 stig fyrir hvern staf sem þú náðir rétt.</Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('krossgata') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-2 mb-6">
+                                                            <Text className="text-gray-600 text-sm">• Smelltu á reit til að sjá vísbendinguna sem á við hann.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Skrifaðu svar við vísbendingunni lárétt eða lóðrétt.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Litlu tölurnar í horninu hjálpa þér að staðsetja orð.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Öll orð verða að vera rétt til að sigra gátuna!</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Verðlaun dagsins:</Text> Þú færð 100 XP fyrir að klára gátuna. Það er ekki hægt að tapa, svo taktu þér bara þann tíma sem þú þarft!</Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('tengingar') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-2 mb-6">
+                                                            <Text className="text-gray-600 text-sm">• Finndu 4 hópa úr 4 orðum sem deila sameiginlegri tengingu.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Veldu 4 orð sem þú telur að passa saman og smelltu á <Text className="font-bold text-gray-800">Giska</Text>.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Þú hefur einungis 4 tilraunir til að finna allar tengingarnar. Ef þú giskar 4x vitlaust þá taparðu leiknum</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Stig:</Text> Þú færð 100 stig (XP) fyrir að sigra leikinn. Ef þú áttir einhverjar tilraunir eftir þá færðu auka 10 stig fyrir hverja tilraun sem var eftir. Ef þú tapar leiknum þá geturðu samt fengið 10 stig fyrir hverja tengingu sem þú fannst</Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('sprengjuleit') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-4 mb-6">
+                                                            <Text className="text-gray-600 text-sm">• Markmiðið er að afhjúpa alla reitina á borðinu án þess að smella á sprengju.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Ef reitur sýnir tölu (t.d. 2) þá þýðir það að nákvæmlega tvær sprengjur liggja í næstu 8 reitum í kringum hann.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Haltu inni til að setja niður flagg á þá reiti sem þú ert viss um að feli sprengju. Tölurnar að ofan sýna hversu margar sprengjur þú átt eftir að finna.</Text>
+                                                            <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
+                                                                <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">Þú færð meira XP eftir því sem þú leysir þrautina hraðar. Þú byrjar með möguleika á <Text className="font-bold text-[#1A1A1B]">200 XP</Text>, en missir 1 stig á hverjum þremur sekúndum sem líða! Lágmark 100 XP fyrir sigur eða 0 XP ef þú smellir á sprengju.</Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('kviss') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-4 mb-6">
+                                                            <Text className="text-gray-600 text-sm">• Svaraðu 5 spurningum eins hratt og rétt og þú getur.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Þú hefur <Text className="font-bold text-gray-800">10 sekúndur</Text> til að svara hverri spurningu. Ef tíminn rennur út telst svarið rangt.</Text>
+                                                            <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
+                                                                <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">Þú færð <Text className="font-bold text-[#1A1A1B]">30 XP</Text> fyrir hvert rétt svar (að hámarki 150 XP).</Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('minnisspil') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-4 mb-6">
+                                                            <Text className="text-gray-600 text-sm">• Markmiðið er að finna öll pörin í færstu mögulegu tilraunum.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Smelltu á tvö spil til að snúa þeim við.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Ef spilin sýna <Text className="font-bold text-[#1A1A1B]">sama táknið</Text> festast þau uppi sem par!</Text>
+                                                            <Text className="text-gray-600 text-sm">• Ef spilin eru ekki eins munu þau snúast aftur við. Mundu vel hvar táknin liggja til að reyna aftur seinna.</Text>
+                                                            <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
+                                                                <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">Þú missir engin stig fyrir fyrstu 10 ágiskanirnar þínar (meðan þú ert að læra hvar spilin liggja). Hins vegar færðu <Text className="font-bold text-red-500">-10 XP í refsistig í hvert skipti sem þú snýrð við tveimur spilum sem parast ekki</Text>. Hámark: 200 XP. Lágmark: 30 XP.</Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('litakodi') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-4 mb-6">
+                                                            <Text className="text-gray-600 text-sm">• Markmiðið er að giska á rétta röð af 4 litum á 6 tilraunum eða færri.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Litröðin er falin. Litir GETA verið endurteknir.</Text>
+                                                            <Text className="font-bold text-gray-800 mt-2">Vísbendingar (Götin til hægri):</Text>
+                                                            <View className="ml-2 space-y-2">
+                                                                <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Dökkur nagli:</Text> Réttur litur á réttum stað.</Text>
+                                                                <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Hvítur nagli:</Text> Réttur litur, en á vitlausum stað.</Text>
+                                                            </View>
+                                                            <Text className="text-xs italic text-gray-400">Ath: Vísbendingarnar segja þér ekki NÁKVÆMLEGA hvaða pinnar eru réttir, aðeins fjöldann.</Text>
+                                                            <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100 space-y-1">
+                                                                <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">• Þú færð <Text className="font-bold text-[#1A1A1B]">0 XP</Text> ef þú tapar.</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">• Þú færð <Text className="font-bold text-[#1A1A1B]">100 XP</Text> í grunninn fyrir að vinna leikinn.</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">• <Text className="font-bold text-[#1A1A1B]">Bónus stig:</Text> Fyrir hverja ónotaða ágiskun færðu <Text className="font-bold text-[#1A1A1B]">+20 XP</Text> að auki. Ef þú giskar rétt í fyrstu tilraun færðu því heil 200 XP!</Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('myndagata') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-4 mb-6">
+                                                            <Text className="text-gray-600 text-sm font-medium">Lestu tölurnar og beittu útilokunaraðferð til að teikna leyndarmál dagsins.</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Tölurnar:</Text> Setja skal "x" fjölda af svörtum kubbum í röð á borðið samkvæmt tölum dálks og raðar.</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Bilin:</Text> Ef talan er t.d. [ 1 ] [ 1 ] þýðir það að setja skal einn reit, lágmark EITT tómt bil, og svo annan reit. Tóma bilið á milli reita getur verið lengra en eitt.</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Skipanir:</Text> Ýttu á reit til að merkja hann. Haltu inni eða notaðu krossa takkann til að krossa út reiti sem eiga að vera tómir.</Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {gameId.startsWith('samhengi') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-4 mb-6">
+                                                            <Text className="text-gray-600 text-sm font-medium">Finndu leyniorðið. Þú getur giskað á hvaða orð sem er.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Öll orð í íslensku hafa verið röðuð eftir því hversu lík þau eru leyniorðinu.</Text>
+                                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Sæti 1</Text> er leyniorðið sjálft.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Grænn litur þýðir að þú ert mjög nálægt, gulur er miðlungs, en rauður er mjög langt í burtu.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Þú hefur ótakmarkaðan fjölda af ágiskunum.</Text>
+                                                            <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
+                                                                <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Stigagjöf (XP):</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">Þú færð <Text className="font-bold text-[#1A1A1B]">100 XP</Text> fyrir að finna leyniorðið.</Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {/* Generic Fallback */}
+                                                {!['ordla', 'stafarugl', 'straumur', 'sudoku', 'hengimadur', 'krossgata', 'tengingar', 'sprengjuleit', 'kviss', 'litakodi', 'minnisspil', 'myndagata', 'samhengi'].some(id => gameId.startsWith(id)) && (
+                                                    <Text className="text-gray-600 text-base leading-6">Leystu þrautina og fáðu sem bestan tíma eða flest stig! Gangi þér vel.</Text>
+                                                )}
+                                            </ScrollView>
+                                            <TouchableOpacity onPress={() => setShowHelp(false)} className="mt-6 bg-[#1A1A1B] w-full py-4 rounded-full items-center">
+                                                <Text className="text-white font-bold text-lg">Loka og Spila</Text>
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('hengimadur') && (
-                                <View className="pb-4">
-                                    <Text className="text-gray-600 font-medium mb-4 text-base">Giskaðu á orðið staf fyrir staf.</Text>
-                                    <View className="space-y-3 mb-6">
-                                        <Text className="text-gray-600 text-sm">• Þú þarft að giska á alla réttu stafina í 6 tilraunum eða færri til að vinna.</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Stig:</Text> Þú færð 100 stig (XP) fyrir að vinna. Þú færð fleiri stig fyrir hærri erfiðleikastig: Miðlungs gefur +20, Erfitt gefur +40.</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Bónus stig:</Text> Ef þú vinnur leikinn í færri en 6 tilraunum færðu +10 stig fyrir hverja tilraun sem þú áttir eftir.</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Stig þrátt fyrir tap:</Text> Ef að þú tapar þá færðu samt +5 stig fyrir hvern staf sem þú náðir rétt.</Text>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('krossgata') && (
-                                <View className="pb-4">
-                                    <View className="space-y-2 mb-6">
-                                        <Text className="text-gray-600 text-sm">• Smelltu á reit til að sjá vísbendinguna sem á við hann.</Text>
-                                        <Text className="text-gray-600 text-sm">• Skrifaðu svar við vísbendingunni lárétt eða lóðrétt.</Text>
-                                        <Text className="text-gray-600 text-sm">• Litlu tölurnar í horninu hjálpa þér að staðsetja orð.</Text>
-                                        <Text className="text-gray-600 text-sm">• Öll orð verða að vera rétt til að sigra gátuna!</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Verðlaun dagsins:</Text> Þú færð 100 XP fyrir að klára gátuna. Það er ekki hægt að tapa, svo taktu þér bara þann tíma sem þú þarft!</Text>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('tengingar') && (
-                                <View className="pb-4">
-                                    <View className="space-y-2 mb-6">
-                                        <Text className="text-gray-600 text-sm">• Finndu 4 hópa úr 4 orðum sem deila sameiginlegri tengingu.</Text>
-                                        <Text className="text-gray-600 text-sm">• Veldu 4 orð sem þú telur að passa saman og smelltu á <Text className="font-bold text-gray-800">Giska</Text>.</Text>
-                                        <Text className="text-gray-600 text-sm">• Þú hefur einungis 4 tilraunir til að finna allar tengingarnar. Ef þú giskar 4x vitlaust þá taparðu leiknum</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Stig:</Text> Þú færð 100 stig (XP) fyrir að sigra leikinn. Ef þú áttir einhverjar tilraunir eftir þá færðu auka 10 stig fyrir hverja tilraun sem var eftir. Ef þú tapar leiknum þá geturðu samt fengið 10 stig fyrir hverja tengingu sem þú fannst</Text>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('sprengjuleit') && (
-                                <View className="pb-4">
-                                    <View className="space-y-4 mb-6">
-                                        <Text className="text-gray-600 text-sm">• Markmiðið er að afhjúpa alla reitina á borðinu án þess að smella á sprengju.</Text>
-                                        <Text className="text-gray-600 text-sm">• Ef reitur sýnir tölu (t.d. 2) þá þýðir það að nákvæmlega tvær sprengjur liggja í næstu 8 reitum í kringum hann.</Text>
-                                        <Text className="text-gray-600 text-sm">• Haltu inni til að setja niður flagg á þá reiti sem þú ert viss um að feli sprengju. Tölurnar að ofan sýna hversu margar sprengjur þú átt eftir að finna.</Text>
-                                        <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
-                                            <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
-                                            <Text className="text-sm font-medium text-gray-600">Þú færð meira XP eftir því sem þú leysir þrautina hraðar. Þú byrjar með möguleika á <Text className="font-bold text-[#1A1A1B]">200 XP</Text>, en missir 1 stig á hverjum þremur sekúndum sem líða! Lágmark 100 XP fyrir sigur eða 0 XP ef þú smellir á sprengju.</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('kviss') && (
-                                <View className="pb-4">
-                                    <View className="space-y-4 mb-6">
-                                        <Text className="text-gray-600 text-sm">• Svaraðu 5 spurningum eins hratt og rétt og þú getur.</Text>
-                                        <Text className="text-gray-600 text-sm">• Þú hefur <Text className="font-bold text-gray-800">10 sekúndur</Text> til að svara hverri spurningu. Ef tíminn rennur út telst svarið rangt.</Text>
-                                        <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
-                                            <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
-                                            <Text className="text-sm font-medium text-gray-600">Þú færð <Text className="font-bold text-[#1A1A1B]">30 XP</Text> fyrir hvert rétt svar (að hámarki 150 XP).</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('minnisspil') && (
-                                <View className="pb-4">
-                                    <View className="space-y-4 mb-6">
-                                        <Text className="text-gray-600 text-sm">• Markmiðið er að finna öll pörin í færstu mögulegu tilraunum.</Text>
-                                        <Text className="text-gray-600 text-sm">• Smelltu á tvö spil til að snúa þeim við.</Text>
-                                        <Text className="text-gray-600 text-sm">• Ef spilin sýna <Text className="font-bold text-[#1A1A1B]">sama táknið</Text> festast þau uppi sem par!</Text>
-                                        <Text className="text-gray-600 text-sm">• Ef spilin eru ekki eins munu þau snúast aftur við. Mundu vel hvar táknin liggja til að reyna aftur seinna.</Text>
-                                        <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
-                                            <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
-                                            <Text className="text-sm font-medium text-gray-600">Þú missir engin stig fyrir fyrstu 10 ágiskanirnar þínar (meðan þú ert að læra hvar spilin liggja). Hins vegar færðu <Text className="font-bold text-red-500">-10 XP í refsistig í hvert skipti sem þú snýrð við tveimur spilum sem parast ekki</Text>. Hámark: 200 XP. Lágmark: 30 XP.</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('litakodi') && (
-                                <View className="pb-4">
-                                    <View className="space-y-4 mb-6">
-                                        <Text className="text-gray-600 text-sm">• Markmiðið er að giska á rétta röð af 4 litum á 6 tilraunum eða færri.</Text>
-                                        <Text className="text-gray-600 text-sm">• Litröðin er falin. Litir GETA verið endurteknir.</Text>
-                                        <Text className="font-bold text-gray-800 mt-2">Vísbendingar (Götin til hægri):</Text>
-                                        <View className="ml-2 space-y-2">
-                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Dökkur nagli:</Text> Réttur litur á réttum stað.</Text>
-                                            <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Hvítur nagli:</Text> Réttur litur, en á vitlausum stað.</Text>
-                                        </View>
-                                        <Text className="text-xs italic text-gray-400">Ath: Vísbendingarnar segja þér ekki NÁKVÆMLEGA hvaða pinnar eru réttir, aðeins fjöldann.</Text>
-                                        <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100 space-y-1">
-                                            <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Verðlaun:</Text>
-                                            <Text className="text-sm font-medium text-gray-600">• Þú færð <Text className="font-bold text-[#1A1A1B]">0 XP</Text> ef þú tapar.</Text>
-                                            <Text className="text-sm font-medium text-gray-600">• Þú færð <Text className="font-bold text-[#1A1A1B]">100 XP</Text> í grunninn fyrir að vinna leikinn.</Text>
-                                            <Text className="text-sm font-medium text-gray-600">• <Text className="font-bold text-[#1A1A1B]">Bónus stig:</Text> Fyrir hverja ónotaða ágiskun færðu <Text className="font-bold text-[#1A1A1B]">+20 XP</Text> að auki. Ef þú giskar rétt í fyrstu tilraun færðu því heil 200 XP!</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('myndagata') && (
-                                <View className="pb-4">
-                                    <View className="space-y-4 mb-6">
-                                        <Text className="text-gray-600 text-sm font-medium">Lestu tölurnar og beittu útilokunaraðferð til að teikna leyndarmál dagsins.</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Tölurnar:</Text> Setja skal "x" fjölda af svörtum kubbum í röð á borðið samkvæmt tölum dálks og raðar.</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Bilin:</Text> Ef talan er t.d. [ 1 ] [ 1 ] þýðir það að setja skal einn reit, lágmark EITT tómt bil, og svo annan reit. Tóma bilið á milli reita getur verið lengra en eitt.</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Skipanir:</Text> Ýttu á reit til að merkja hann. Haltu inni eða notaðu krossa takkann til að krossa út reiti sem eiga að vera tómir.</Text>
-                                    </View>
-                                </View>
-                            )}
-                            {gameId.startsWith('samhengi') && (
-                                <View className="pb-4">
-                                    <View className="space-y-4 mb-6">
-                                        <Text className="text-gray-600 text-sm font-medium">Finndu leyniorðið. Þú getur giskað á hvaða orð sem er.</Text>
-                                        <Text className="text-gray-600 text-sm">• Öll orð í íslensku hafa verið röðuð eftir því hversu lík þau eru leyniorðinu.</Text>
-                                        <Text className="text-gray-600 text-sm">• <Text className="font-bold text-gray-800">Sæti 1</Text> er leyniorðið sjálft.</Text>
-                                        <Text className="text-gray-600 text-sm">• Grænn litur þýðir að þú ert mjög nálægt, gulur er miðlungs, en rauður er mjög langt í burtu.</Text>
-                                        <Text className="text-gray-600 text-sm">• Þú hefur ótakmarkaðan fjölda af ágiskunum.</Text>
-                                        <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
-                                            <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Stigagjöf (XP):</Text>
-                                            <Text className="text-sm font-medium text-gray-600">Þú færð <Text className="font-bold text-[#1A1A1B]">100 XP</Text> fyrir að finna leyniorðið.</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                            {/* Generic Fallback */}
-                            {!['ordla','stafarugl','straumur','sudoku','hengimadur','krossgata','tengingar','sprengjuleit','kviss','litakodi','minnisspil','myndagata','samhengi'].some(id => gameId.startsWith(id)) && (
-                                <Text className="text-gray-600 text-base leading-6">Leystu þrautina og fáðu sem bestan tíma eða flest stig! Gangi þér vel.</Text>
-                            )}
-                        </ScrollView>
-                        <TouchableOpacity onPress={() => setShowHelp(false)} className="mt-6 bg-[#1A1A1B] w-full py-4 rounded-full items-center">
-                            <Text className="text-white font-bold text-lg">Loka og Spila</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+                                </Modal>
 
         </View>
-    );
+                    );
 };
