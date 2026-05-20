@@ -14,6 +14,7 @@ const BASE_GAMES = [
     { id: 'hengimadur', name: 'Hengimaður', desc: 'Bjargaðu karlinum úr snörunni með því að giska á stafina í orðinu.', iconType: 'hengimadur', badge: null },
     { id: 'sudoku', name: 'Sudoku', desc: 'Settu tölustafina í réttan reit.', iconType: 'sudoku', badge: null },
     { id: 'samhengi', name: 'Samhengi', desc: 'Finndu leyniorðið með því að giska á orð sem tengjast því í samhengi.', iconType: 'samhengi', badge: 'ÁSKRIFT' },
+    { id: 'krossreikningur', name: 'Krossreikningur', desc: 'Leystu stærðfræðiþrautir í kross.', iconType: 'krossreikningur', badge: 'ÁSKRIFT' },
     { id: 'tengingar', name: 'Tengingar', desc: 'Finndu fjóra flokka með fjórum orðum sem tengjast.', iconType: 'tengingar', badge: 'ÁSKRIFT' },
     { id: 'myndagata', name: 'Myndagáta', desc: 'Teiknaðu myndina með því að fylla út í reitina samkvæmt tölunum.', iconType: 'myndagata', badge: 'ÁSKRIFT' },
     { id: 'straumur', name: 'Straumur', desc: 'Dragðu yfir stafina til að finna orðin. Líkt stafarugli en hver stafur tilheyrir orði.', iconType: 'straumur', badge: 'ÁSKRIFT' },
@@ -23,7 +24,6 @@ const BASE_GAMES = [
     { id: 'kviss', name: 'Kviss', desc: 'Svaraðu fimm spennandi spurningum dagsins.', iconType: 'kviss', badge: 'ÁSKRIFT' },
     { id: 'litakodi', name: 'Litakóði', desc: 'Reyndu að finna réttan litakóða í 6 eða færri tilraunum.', iconType: 'litakodi', badge: 'ÁSKRIFT' },
     { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null },
-    { id: 'krossreikningur', name: 'Krossreikningur', desc: 'Leystu stærðfræðiþrautir í kross.', iconType: 'krossreikningur', badge: 'ÁSKRIFT' },
     { id: 'dulmal', name: 'Dulmál', desc: 'Notaðu rökvísi til að brjóta dulmálið og finna orðið.', iconType: 'dulmal', badge: 'VÆNTANLEGT' }
 ];
 
@@ -434,9 +434,9 @@ const GameCard = React.memo(({
                 <GameGraphic type={game.iconType} />
 
                 {showBadge && (
-                    <View className={`absolute top-3 right-3 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5 ${game.badge === 'VÆNTANLEGT' ? 'bg-indigo-600/90' : 'bg-indigo-950/90'}`} style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
+                    <View className={`absolute top-3 right-3 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5 ${game.badge === 'VÆNTANLEGT' ? 'bg-white/95 border border-slate-100' : 'bg-indigo-950/90'}`} style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
                         {game.badge !== 'VÆNTANLEGT' && <Ionicons name="lock-closed" size={10} color="#EAB308" />}
-                        <Text className="text-[9px] font-black uppercase text-white tracking-widest leading-none">{game.badge}</Text>
+                        <Text className={`text-[9px] font-black uppercase tracking-widest leading-none ${game.badge === 'VÆNTANLEGT' ? 'text-indigo-600' : 'text-white'}`}>{game.badge}</Text>
                     </View>
                 )}
             </View>
