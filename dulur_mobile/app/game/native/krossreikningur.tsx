@@ -62,7 +62,7 @@ export default function NativeKrossreikningur() {
             
             let puzzles = allPuzzles;
             if (!puzzles) {
-                puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init`).then(res => res.json());
+                puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init?d=${today}`).then(res => res.json());
                 setAllPuzzles(puzzles);
             }
 
