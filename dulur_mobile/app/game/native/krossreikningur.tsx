@@ -224,6 +224,22 @@ export default function NativeKrossreikningur() {
         }, { onConflict: 'user_id, game_type' });
     };
 
+    const evalOp = (a: number, op: string, b: number) => {
+        if (op === '+') return a + b;
+        if (op === '-') return a - b;
+        if (op === '*') return a * b;
+        if (op === '/') return a / b;
+        return a;
+    };
+
+    const evalEq = (nums: number[], operators: string[]) => {
+        let res = nums[0];
+        for (let i = 0; i < operators.length; i++) {
+            res = evalOp(res, operators[i], nums[i + 1]);
+        }
+        return res;
+    };
+
     const validateBoard = async (currentGrid = grid) => {
         const isFull = currentGrid.every(row => row.every(c => c.type !== 'empty'));
         if (!isFull) {
@@ -233,44 +249,48 @@ export default function NativeKrossreikningur() {
         }
 
         let isCorrect = true;
-        const R = currentGrid.length;
-        const C = currentGrid[0].length;
 
-        // Extract equations horizontaly
-        for (let r = 0; r < R; r++) {
-            let currentEq: CellData[] = [];
-            for (let c = 0; c < C; c++) {
-                const cell = currentGrid[r][c];
-                if (cell.type === 'blank') {
-                    if (currentEq.length > 0) {
-                        if (!checkEquation(currentEq)) isCorrect = false;
-                        currentEq = [];
+        for (let r = 0; r < currentGrid.length; r++) {
+            for (let c = 0; c < currentGrid[r].length; c++) {
+                if (currentGrid[r][c].type === 'operator' && currentGrid[r][c].value === '=') {
+                    // Check horizontal equation
+                    if (c > 0 && currentGrid[r][c - 1].type !== 'blank') {
+                        let nums: number[] = [];
+                        let ops: string[] = [];
+                        let cc = c - 1;
+                        while (cc >= 0 && currentGrid[r][cc].type !== 'blank' && currentGrid[r][cc].value !== '=') {
+                            if (currentGrid[r][cc].type === 'number' || currentGrid[r][cc].type === 'empty') {
+                                nums.unshift(currentGrid[r][cc].value as number);
+                            } else {
+                                ops.unshift(currentGrid[r][cc].value as string);
+                            }
+                            cc--;
+                        }
+                        let expectedRes = currentGrid[r][c + 1].value as number;
+                        if (nums.includes(null as any) || evalEq(nums, ops) !== expectedRes) {
+                            isCorrect = false;
+                        }
                     }
-                } else {
-                    currentEq.push(cell);
-                }
-            }
-            if (currentEq.length > 0) {
-                if (!checkEquation(currentEq)) isCorrect = false;
-            }
-        }
 
-        // Extract equations vertically
-        for (let c = 0; c < C; c++) {
-            let currentEq: CellData[] = [];
-            for (let r = 0; r < R; r++) {
-                const cell = currentGrid[r][c];
-                if (cell.type === 'blank') {
-                    if (currentEq.length > 0) {
-                        if (!checkEquation(currentEq)) isCorrect = false;
-                        currentEq = [];
+                    // Check vertical equation
+                    if (r > 0 && currentGrid[r - 1][c].type !== 'blank') {
+                        let nums: number[] = [];
+                        let ops: string[] = [];
+                        let rr = r - 1;
+                        while (rr >= 0 && currentGrid[rr][c].type !== 'blank' && currentGrid[rr][c].value !== '=') {
+                            if (currentGrid[rr][c].type === 'number' || currentGrid[rr][c].type === 'empty') {
+                                nums.unshift(currentGrid[rr][c].value as number);
+                            } else {
+                                ops.unshift(currentGrid[rr][c].value as string);
+                            }
+                            rr--;
+                        }
+                        let expectedRes = currentGrid[r + 1][c].value as number;
+                        if (nums.includes(null as any) || evalEq(nums, ops) !== expectedRes) {
+                            isCorrect = false;
+                        }
                     }
-                } else {
-                    currentEq.push(cell);
                 }
-            }
-            if (currentEq.length > 0) {
-                if (!checkEquation(currentEq)) isCorrect = false;
             }
         }
 
@@ -283,38 +303,6 @@ export default function NativeKrossreikningur() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setErrorMsg("Það eru villur á borðinu. Reyndu aftur!");
         }
-    };
-
-    const checkEquation = (eq: CellData[]) => {
-        if (eq.length < 3) return true; // not a real equation
-
-        let nums: number[] = [];
-        let ops: string[] = [];
-        let hasEquals = false;
-        let expectedRes: number | null = null;
-
-        for (let i = 0; i < eq.length; i++) {
-            const cell = eq[i];
-            if (cell.type === 'number') {
-                if (hasEquals) expectedRes = cell.value as number;
-                else nums.push(cell.value as number);
-            } else if (cell.type === 'operator') {
-                if (cell.value === '=') hasEquals = true;
-                else ops.push(cell.value as string);
-            }
-        }
-
-        if (expectedRes === null) return true; // not a full equation
-
-        let res = nums[0];
-        for (let i = 0; i < ops.length; i++) {
-            if (ops[i] === '+') res += nums[i + 1];
-            if (ops[i] === '-') res -= nums[i + 1];
-            if (ops[i] === '*') res *= nums[i + 1];
-            if (ops[i] === '/') res /= nums[i + 1];
-        }
-
-        return res === expectedRes;
     };
 
     const syncWin = async () => {
