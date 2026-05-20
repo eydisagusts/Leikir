@@ -153,10 +153,10 @@ export default function NativeSamhengi() {
 
     const handleGuess = async () => {
         if (gameState !== 'playing' || !currentInput.trim() || !puzzleData) return;
-        
+
         const guessWord = currentInput.trim().toUpperCase();
         setCurrentInput('');
-        
+
         if (guesses.some(g => g.word === guessWord)) {
             setToast('Þú hefur þegar giskað á þetta orð.');
             setTimeout(() => setToast(null), 2000);
@@ -176,7 +176,7 @@ export default function NativeSamhengi() {
             DeviceEventEmitter.emit('stop-timer');
             setGameState('won');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            
+
             const xp = Math.max(0, 100 - (hintsUsed * 10));
             setEarnedXp(xp);
             setIsFreshGameOver(true);
@@ -208,7 +208,7 @@ export default function NativeSamhengi() {
                     if (d.success && typeof d.xpEarned === 'number') {
                         setEarnedXp(d.xpEarned);
                     }
-                } catch(e) {}
+                } catch (e) { }
             }
         }
     };
@@ -268,7 +268,7 @@ export default function NativeSamhengi() {
         if (gameState !== 'playing' || !puzzleData) return;
         Alert.alert(
             'Gefast upp?',
-            'Ertu viss um að þú viljir gefast upp? Þú færð 0 XP fyrir leikinn.',
+            'Ertu viss um að þú viljir gefast upp? Þú færð 0 stig fyrir leikinn.',
             [
                 { text: 'Hætta við', style: 'cancel' },
                 {
@@ -343,101 +343,101 @@ export default function NativeSamhengi() {
     return (
         <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
             <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-            <MobileGameLayout 
+            <MobileGameLayout
                 gameId="samhengi"
-                gameTitle="Samhengi" 
+                gameTitle="Samhengi"
                 isGameOver={gameState !== 'playing'}
                 onBack={() => router.replace('/(tabs)')}
             >
-            <View className="flex-1 px-4 mt-2">
-                <Text className="text-slate-500 text-center mb-6">Finndu leyniorðið. Orðin eru raðuð eftir því hversu oft þau koma fyrir í sama samhengi og leyniorðið.</Text>
+                <View className="flex-1 px-4 mt-2">
+                    <Text className="text-slate-500 text-center mb-6">Giskaðu á leyniorð dagsins. Orðin eru flokkuð eftir því hversu lík þau eru að merkingu.</Text>
 
-                <View className="relative w-full mb-4">
-                    <TextInput
-                        value={currentInput}
-                        onChangeText={(text) => {
-                            DeviceEventEmitter.emit('start-timer');
-                            setCurrentInput(text);
-                        }}
-                        onSubmitEditing={handleGuess}
-                        placeholder="Skrifaðu orð..."
-                        placeholderTextColor="#94a3b8"
-                        editable={gameState === 'playing'}
-                        className="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-slate-200 focus:border-slate-400 focus:outline-none bg-white text-xl font-bold uppercase"
-                        style={{ paddingVertical: 0 }}
-                        autoCapitalize="characters"
-                        autoCorrect={false}
-                    />
-                    <Ionicons name="search" size={24} color="#94a3b8" style={{ position: 'absolute', left: 16, top: 16 }} />
-                </View>
+                    <View className="relative w-full mb-4">
+                        <TextInput
+                            value={currentInput}
+                            onChangeText={(text) => {
+                                DeviceEventEmitter.emit('start-timer');
+                                setCurrentInput(text);
+                            }}
+                            onSubmitEditing={handleGuess}
+                            placeholder="Skrifaðu orð..."
+                            placeholderTextColor="#94a3b8"
+                            editable={gameState === 'playing'}
+                            className="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-slate-200 focus:border-slate-400 focus:outline-none bg-white text-xl font-bold uppercase"
+                            style={{ paddingVertical: 0 }}
+                            autoCapitalize="characters"
+                            autoCorrect={false}
+                        />
+                        <Ionicons name="search" size={24} color="#94a3b8" style={{ position: 'absolute', left: 16, top: 16 }} />
+                    </View>
 
-                <View className="flex-row justify-between items-center mb-4 px-1">
-                    <Text className="text-sm font-bold text-slate-500">{guesses.length} ágiskanir</Text>
-                    {gameState === 'playing' && (
-                        <View className="flex-row items-center gap-2">
-                            <TouchableOpacity 
-                                onPress={handleGiveUp}
-                                className="px-3 py-1.5 rounded-full flex-row items-center bg-red-50 border border-red-200"
-                            >
-                                <Text className="font-bold text-xs text-red-500">Gefast upp</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                onPress={handleHint}
-                                disabled={hintsUsed >= 6}
-                                className={`px-3 py-1.5 rounded-full flex-row items-center ${hintsUsed > 0 ? 'bg-amber-100 border border-amber-300' : 'bg-slate-100'}`}
-                            >
-                                <Ionicons name="bulb" size={16} color={hintsUsed > 0 ? '#d97706' : '#64748b'} />
-                                <Text className={`font-bold ml-1 text-xs ${hintsUsed > 0 ? 'text-amber-600' : 'text-slate-500'}`}>
-                                    Vísbending {hintsUsed > 0 && `(-${hintsUsed * 10} XP)`}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                    <View className="flex-row justify-between items-center mb-4 px-1">
+                        <Text className="text-sm font-bold text-slate-500">{guesses.length} ágiskanir</Text>
+                        {gameState === 'playing' && (
+                            <View className="flex-row items-center gap-2">
+                                <TouchableOpacity
+                                    onPress={handleGiveUp}
+                                    className="px-3 py-1.5 rounded-full flex-row items-center bg-red-50 border border-red-200"
+                                >
+                                    <Text className="font-bold text-xs text-red-500">Gefast upp</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={handleHint}
+                                    disabled={hintsUsed >= 6}
+                                    className={`px-3 py-1.5 rounded-full flex-row items-center ${hintsUsed > 0 ? 'bg-amber-100 border border-amber-300' : 'bg-slate-100'}`}
+                                >
+                                    <Ionicons name="bulb" size={16} color={hintsUsed > 0 ? '#d97706' : '#64748b'} />
+                                    <Text className={`font-bold ml-1 text-xs ${hintsUsed > 0 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                        Vísbending {hintsUsed > 0 && `(-${hintsUsed * 10} XP)`}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+
+                    {toast && (
+                        <Animated.View entering={FadeIn} exiting={FadeOut} className="bg-red-500 py-2 px-4 rounded-lg self-center mb-4">
+                            <Text className="text-white font-bold">{toast}</Text>
+                        </Animated.View>
                     )}
+
+                    <ScrollView className="flex-1 w-full" showsVerticalScrollIndicator={false}>
+                        <View className="flex-col gap-3 pb-8">
+                            {guesses.map((g, i) => (
+                                <Animated.View key={`${g.word}-${i}`} entering={FadeIn.duration(400)} className="w-full h-12 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex-row items-center px-4 relative">
+                                    <View
+                                        className={`absolute left-0 top-0 bottom-0 ${getBarColor(g.rank)} opacity-30`}
+                                        style={{ width: getBarWidth(g.rank) as any }}
+                                    />
+                                    <View className="flex-1 flex-row justify-between items-center z-10">
+                                        <Text className="font-bold uppercase text-lg text-slate-800">{g.word}</Text>
+                                        <Text className="font-mono font-bold text-slate-500">{g.rank === 10000 ? '>10.000' : g.rank}</Text>
+                                    </View>
+                                </Animated.View>
+                            ))}
+                            {guesses.length === 0 && (
+                                <Text className="text-center text-slate-400 py-8">Engar ágiskanir ennþá</Text>
+                            )}
+                        </View>
+                    </ScrollView>
                 </View>
 
-                {toast && (
-                    <Animated.View entering={FadeIn} exiting={FadeOut} className="bg-red-500 py-2 px-4 rounded-lg self-center mb-4">
-                        <Text className="text-white font-bold">{toast}</Text>
+                {showFlyXp && (
+                    <Animated.View style={[{ position: 'absolute', top: Dimensions.get('window').height * 0.6, left: 0, right: 0, alignItems: 'center', zIndex: 100 }, xpFloatingStyle]} pointerEvents="none">
+                        <View className="bg-[#EAB308] border-2 border-[#CA8A04] px-4 py-2 rounded-xl flex-row items-center gap-2 shadow-lg">
+                            <Ionicons name="star" size={24} color="white" />
+                            <Text className="text-white font-black text-2xl">+{earnedXp}</Text>
+                        </View>
                     </Animated.View>
                 )}
 
-                <ScrollView className="flex-1 w-full" showsVerticalScrollIndicator={false}>
-                    <View className="flex-col gap-3 pb-8">
-                        {guesses.map((g, i) => (
-                            <Animated.View key={`${g.word}-${i}`} entering={FadeIn.duration(400)} className="w-full h-12 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex-row items-center px-4 relative">
-                                <View 
-                                    className={`absolute left-0 top-0 bottom-0 ${getBarColor(g.rank)} opacity-30`} 
-                                    style={{ width: getBarWidth(g.rank) as any }} 
-                                />
-                                <View className="flex-1 flex-row justify-between items-center z-10">
-                                    <Text className="font-bold uppercase text-lg text-slate-800">{g.word}</Text>
-                                    <Text className="font-mono font-bold text-slate-500">{g.rank === 10000 ? '>10.000' : g.rank}</Text>
-                                </View>
-                            </Animated.View>
-                        ))}
-                        {guesses.length === 0 && (
-                            <Text className="text-center text-slate-400 py-8">Engar ágiskanir ennþá</Text>
-                        )}
-                    </View>
-                </ScrollView>
-            </View>
-
-            {showFlyXp && (
-                <Animated.View style={[{ position: 'absolute', top: Dimensions.get('window').height * 0.6, left: 0, right: 0, alignItems: 'center', zIndex: 100 }, xpFloatingStyle]} pointerEvents="none">
-                    <View className="bg-[#EAB308] border-2 border-[#CA8A04] px-4 py-2 rounded-xl flex-row items-center gap-2 shadow-lg">
-                        <Ionicons name="star" size={24} color="white" />
-                        <Text className="text-white font-black text-2xl">+{earnedXp}</Text>
-                    </View>
-                </Animated.View>
-            )}
-
-            <NativeGameEndModal
-                visible={isFreshGameOver}
-                onContinue={handleCloseModal}
-                gameTitle="Samhengi"
-                gameState={gameState as "won" | "lost"}
-                xpEarned={earnedXp}
-            />
+                <NativeGameEndModal
+                    visible={isFreshGameOver}
+                    onContinue={handleCloseModal}
+                    gameTitle="Samhengi"
+                    gameState={gameState as "won" | "lost"}
+                    xpEarned={earnedXp}
+                />
             </MobileGameLayout>
         </SafeAreaView>
     );

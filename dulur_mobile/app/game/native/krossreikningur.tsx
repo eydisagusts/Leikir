@@ -115,7 +115,7 @@ export default function NativeKrossreikningur() {
     }, [difficulty]);
 
     const changeDifficulty = (newDiff: 'easy' | 'medium' | 'hard') => {
-        if (difficulty === newDiff || gameState === 'won') return;
+        if (difficulty === newDiff) return;
         setGameState('loading');
         setGrid([]);
         setAnswerBank([]);
@@ -511,31 +511,26 @@ export default function NativeKrossreikningur() {
                                 })}
                             </View>
                         </View>
-
-                        <View className="mt-8 mb-12 w-full max-w-sm mx-auto flex-row justify-center gap-2 px-4">
-                            <TouchableOpacity 
-                                onPress={() => validateBoard()}
-                                className="bg-[#1A73E8] flex-1 py-3.5 rounded-full shadow-md items-center justify-center opacity-95 active:opacity-100"
-                                disabled={answerBank.some(b => !b.used)}
-                                style={{ opacity: answerBank.some(b => !b.used) ? 0.5 : 1 }}
-                            >
-                                <Text className="text-white font-black text-sm sm:text-base uppercase tracking-wider">Staðfesta</Text>
-                            </TouchableOpacity>
+                        
+                        {/* Clear Button */}
+                        <View className="mt-8 mb-4 w-full max-w-[500px] flex-row gap-4 px-2">
                             <TouchableOpacity 
                                 onPress={() => {
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                     const newGrid = [...grid.map(row => [...row])];
                                     const newBank = [...answerBank];
-                                    for (let r = 0; r < newGrid.length; r++) {
-                                        for (let c = 0; c < newGrid[r].length; c++) {
-                                            if (newGrid[r][c].type === 'number' && !newGrid[r][c].fixed) {
-                                                const val = newGrid[r][c].value;
-                                                newGrid[r][c] = { ...newGrid[r][c], type: 'empty', value: null };
-                                                const oldBankItem = newBank.find(b => b.val === val && b.used);
+                                    
+                                    for (let r=0; r<newGrid.length; r++) {
+                                        for (let c=0; c<newGrid[r].length; c++) {
+                                            const cell = newGrid[r][c];
+                                            if (cell.type === 'number' && !cell.fixed) {
+                                                const oldBankItem = newBank.find(b => b.val === cell.value && b.used);
                                                 if (oldBankItem) oldBankItem.used = false;
+                                                newGrid[r][c] = { ...cell, type: 'empty', value: null };
                                             }
                                         }
                                     }
+                                    
                                     setGrid(newGrid);
                                     setAnswerBank(newBank);
                                     setSelectedCell(null);
@@ -543,10 +538,9 @@ export default function NativeKrossreikningur() {
                                     setErrorMsg(null);
                                     saveState(newGrid, newBank);
                                 }}
-                                disabled={gameState !== 'playing'}
-                                className="bg-white border border-red-200 flex-1 py-3.5 rounded-full shadow-sm items-center justify-center active:bg-red-50"
+                                className="flex-1 bg-white border border-slate-300 py-4 rounded-xl items-center shadow-sm"
                             >
-                                <Text className="text-red-500 font-black text-sm sm:text-base uppercase tracking-wider">Hreinsa</Text>
+                                <Text className="text-slate-600 font-bold text-lg uppercase tracking-wider">Hreinsa</Text>
                             </TouchableOpacity>
                         </View>
 

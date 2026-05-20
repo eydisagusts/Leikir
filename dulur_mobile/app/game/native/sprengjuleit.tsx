@@ -146,10 +146,10 @@ export default function NativeSprengjuleit() {
                     // Fully map winning/losing grid for show (omitted for brevity, just giving blank grid)
                     setGrid(initialGrid);
                 } else {
-                    if (stateData && stateData.state_json.clientGrid) {
-                        setGrid(stateData.state_json.clientGrid);
+                    if (stateData && stateData.state_json.board) {
+                        setGrid(stateData.state_json.board);
                         setFirstClick(false);
-                        const flags = stateData.state_json.clientGrid.flat().filter((c: CellState) => c.isFlagged).length;
+                        const flags = stateData.state_json.board.flat().filter((c: CellState) => c.isFlagged).length;
                         setFlagsPlaced(flags);
                     } else {
                         setGrid(initialGrid);
@@ -389,7 +389,7 @@ export default function NativeSprengjuleit() {
         supabase.from('game_states').upsert({
             user_id: user.id,
             game_type: `sprengjuleit_${today}`,
-            state_json: { clientGrid: cGrid },
+            state_json: { board: cGrid },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();
     };
