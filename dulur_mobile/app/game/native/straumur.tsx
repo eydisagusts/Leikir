@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, PanResponder, StyleSheet, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Share } from 'react-native';
@@ -26,6 +26,7 @@ interface StraumurGameData {
 }
 
 export default function NativeStraumur() {
+    const { date, challengeId } = useLocalSearchParams<{ date: string, challengeId?: string }>();
     const [game, setGame] = useState<StraumurGameData | null>(null);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'loading' | 'error'>('loading');
     
@@ -98,21 +99,24 @@ export default function NativeStraumur() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = date || new Date().toISOString().split('T')[0];
                 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/straumur/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/straumur/init?date=${today}${challengeId ? `&c=${challengeId}` : ''}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
+
+                const isToday = today === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'straumur' : `straumur_${today}`;
 
                 const dbPromises = user ? Promise.all([
                     supabase.from('game_results')
                         .select('won')
                         .eq('user_id', user.id)
                         .eq('game_type', 'straumur')
-                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `straumur_${today}`).maybeSingle()
+                        .eq('metadata->>puzzleDate', today).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [resDataRes, stateDataRes]] = await Promise.all([
@@ -153,7 +157,7 @@ export default function NativeStraumur() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     const triggerError = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -354,23 +358,34 @@ export default function NativeStraumur() {
         if (newFoundWords.length === game!.themeWords.length + 1) {
             DeviceEventEmitter.emit('stop-timer');
             setGameState('won');
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                let elapsed = 120;
-                const date = new Date().toLocaleDateString('en-CA');
-                const savedTime = await AsyncStorage.getItem(`timer_${user.id}_straumur_${date}`);
-                if (savedTime) elapsed = parseInt(savedTime, 10) || 120;
 
-                await supabase.from('game_results').insert({
-                    time_taken_seconds: elapsed,
-                    user_id: user.id,
-                    game_type: 'straumur',
-                    score: 100,
-                    won: true,
-                    metadata: { difficulty: 'medium' }
-                });
-                await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: 100, p_locale: 'is' });
-                setEarnedXp(100);
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    let elapsed = 120;
+                    const todayStr = date || new Date().toISOString().split('T')[0];
+                    const savedTime = await AsyncStorage.getItem(`timer_${user.id}_straumur_${todayStr}`);
+                    if (savedTime) elapsed = parseInt(savedTime, 10) || 120;
+                    
+                    const isToday = todayStr === new Date().toISOString().split('T')[0];
+                    const xpReward = isToday ? 100 : 0;
+
+                    await supabase.from('game_results').insert({
+                        time_taken_seconds: elapsed,
+                        user_id: user.id,
+                        game_type: 'straumur',
+                        score: xpReward,
+                        won: true,
+                        metadata: { difficulty: 'medium', puzzleDate: todayStr }
+                    });
+                    if (xpReward > 0) {
+                        await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
+                    }
+                    setEarnedXp(xpReward);
+                }
+            } catch (e) {
+                console.error('Error during win trigger:', e);
+            } finally {
                 setTimeout(() => setIsFreshGameOver(true), 1000);
             }
         }
@@ -379,10 +394,13 @@ export default function NativeStraumur() {
     const syncGameState = async (words: string[], paths: Coordinate[][]) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !game) return;
-        const today = new Date().toISOString().split('T')[0];
+        const today = date || new Date().toISOString().split('T')[0];
+        const isToday = today === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'straumur' : `straumur_${today}`;
+        
         supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `straumur_${today}`,
+            game_type: gameTypeKey,
             state_json: { foundWords: words, foundPaths: paths },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();

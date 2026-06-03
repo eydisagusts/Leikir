@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, ScrollView, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
@@ -18,6 +18,7 @@ interface Guess {
 }
 
 export default function NativeSamhengi() {
+    const { date, challengeId } = useLocalSearchParams<{ date: string, challengeId?: string }>();
     const [puzzleData, setPuzzleData] = useState<any>(null);
     const [guesses, setGuesses] = useState<Guess[]>([]);
     const [currentInput, setCurrentInput] = useState('');
@@ -57,17 +58,19 @@ export default function NativeSamhengi() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const todayStr = date || new Date().toISOString().split('T')[0];
+                const isToday = todayStr === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'samhengi' : `samhengi_${todayStr}`;
 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/samhengi/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/samhengi/init?date=${todayStr}${challengeId ? `&c=${challengeId}` : ''}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
 
                 const dbPromises = user ? Promise.all([
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'samhengi').maybeSingle(),
-                    supabase.from('game_results').select('won, metadata, score').eq('user_id', user.id).eq('game_type', 'samhengi').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
+                    supabase.from('game_results').select('won, metadata, score').eq('user_id', user.id).eq('game_type', 'samhengi').eq('metadata->>puzzleDate', todayStr).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [stateDataRes, resDataRes]] = await Promise.all([
@@ -85,32 +88,34 @@ export default function NativeSamhengi() {
                 const stateRow = stateDataRes?.data;
                 const resultRow = resDataRes?.data;
 
+                let loadedState = stateRow?.state_json;
+                if (stateRow && !date) {
+                    const updatedDate = new Date(stateRow.updated_at).toISOString().split('T')[0];
+                    if (updatedDate !== todayStr) {
+                        loadedState = null;
+                        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                    }
+                }
+
                 if (resultRow) {
                     // Already played today
                     setGameState('won');
-                    if (stateRow?.state_json?.guesses) {
-                        setGuesses(stateRow.state_json.guesses);
+                    if (loadedState?.guesses) {
+                        setGuesses(loadedState.guesses);
                     } else {
                         setGuesses([{ word: data.target, rank: 1 }]);
                     }
-                } else if (stateRow?.state_json) {
-                    // Check if state is from today
-                    const updatedDate = new Date(stateRow.updated_at).toISOString().split('T')[0];
-                    if (updatedDate === today) {
-                        setGuesses(stateRow.state_json.guesses || []);
-                        setHintsUsed(stateRow.state_json.hintsUsed || 0);
-                        const hasWon = stateRow.state_json.guesses?.some((g: Guess) => g.rank === 1);
-                        if (hasWon) {
-                            if (stateRow.state_json.givenUp) {
-                                setGameState('given_up');
-                            } else {
-                                setGameState('won');
-                            }
+                } else if (loadedState) {
+                    setGuesses(loadedState.guesses || []);
+                    setHintsUsed(loadedState.hintsUsed || 0);
+                    const hasWon = loadedState.guesses?.some((g: Guess) => g.rank === 1);
+                    if (hasWon) {
+                        if (loadedState.givenUp) {
+                            setGameState('given_up');
                         } else {
-                            setGameState('playing');
+                            setGameState('won');
                         }
                     } else {
-                        // Stale state
                         setGameState('playing');
                     }
                 } else {
@@ -123,7 +128,7 @@ export default function NativeSamhengi() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     useEffect(() => {
         if (gameState === 'playing') {
@@ -143,9 +148,12 @@ export default function NativeSamhengi() {
     const saveStateToDb = async (currentGuesses?: Guess[], givenUp: boolean = false) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'samhengi' : `samhengi_${todayStr}`;
         await supabase.from('game_states').upsert({
             user_id: session.user.id,
-            game_type: 'samhengi',
+            game_type: gameTypeKey,
             state_json: { guesses: currentGuesses || guesses, hintsUsed, puzzleId: puzzleData.id, givenUp },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -185,9 +193,11 @@ export default function NativeSamhengi() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
                 try {
+                    const todayStr = date || new Date().toISOString().split('T')[0];
+                    const isToday = todayStr === new Date().toISOString().split('T')[0];
+
                     let elapsed = 60;
-                    const date = new Date().toLocaleDateString('en-CA');
-                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_samhengi_${date}`);
+                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_samhengi_${todayStr}`);
                     if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
                     const res = await fetch(`${API_URL}/api/mobile/samhengi`, {
@@ -201,7 +211,8 @@ export default function NativeSamhengi() {
                             won: true,
                             guessesCount: newGuesses.length,
                             hintsUsed,
-                            timeTakenSeconds: elapsed
+                            timeTakenSeconds: elapsed,
+                            targetDate: todayStr
                         })
                     });
                     const d = await res.json();
@@ -292,9 +303,10 @@ export default function NativeSamhengi() {
                             const { data: { session } } = await supabase.auth.getSession();
                             if (session?.user) {
                                 try {
+                                    const todayStr = date || new Date().toISOString().split('T')[0];
+
                                     let elapsed = 60;
-                                    const date = new Date().toLocaleDateString('en-CA');
-                                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_samhengi_${date}`);
+                                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_samhengi_${todayStr}`);
                                     if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
                                     await fetch(`${API_URL}/api/mobile/samhengi`, {
@@ -308,7 +320,8 @@ export default function NativeSamhengi() {
                                             won: false,
                                             guessesCount: newGuesses.length,
                                             hintsUsed,
-                                            timeTakenSeconds: elapsed
+                                            timeTakenSeconds: elapsed,
+                                            targetDate: todayStr
                                         })
                                     });
                                 } catch (e) { }

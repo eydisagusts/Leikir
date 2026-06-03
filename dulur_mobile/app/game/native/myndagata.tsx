@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, Dimensions, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
@@ -16,6 +16,7 @@ const { width } = Dimensions.get('window');
 type CellState = 0 | 1 | 2;
 
 export default function NativeMyndagata() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [puzzleData, setPuzzleData] = useState<any>(null);
     const [grid, setGrid] = useState<CellState[][]>([]);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'loading' | 'error'>('loading');
@@ -57,17 +58,20 @@ export default function NativeMyndagata() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = date || new Date().toISOString().split('T')[0];
 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/myndagata/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/myndagata/init?date=${today}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
 
+                const isToday = today === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'myndagata' : `myndagata_${today}`;
+
                 const dbPromises = user ? Promise.all([
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'myndagata').maybeSingle(),
-                    supabase.from('game_results').select('won, metadata, score').eq('user_id', user.id).eq('game_type', 'myndagata').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
+                    supabase.from('game_results').select('won, metadata, score').eq('user_id', user.id).eq('game_type', 'myndagata').eq('metadata->>puzzleDate', today).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [stateDataRes, resDataRes]] = await Promise.all([
@@ -95,6 +99,7 @@ export default function NativeMyndagata() {
                         setGrid(stateRow.state_json.grid || data.solution.map((row: any) => row.map(() => 0)));
                         setGameState('playing');
                     } else {
+                        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
                         setGrid(data.solution.map((row: any) => row.map(() => 0)));
                         setGameState('playing');
                     }
@@ -109,7 +114,7 @@ export default function NativeMyndagata() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     useEffect(() => {
         if (gameState === 'playing') {
@@ -120,9 +125,14 @@ export default function NativeMyndagata() {
     const saveStateToDb = async (currentGrid: CellState[][]) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user || !puzzleData) return;
+
+        const today = date || new Date().toISOString().split('T')[0];
+        const isToday = today === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'myndagata' : `myndagata_${today}`;
+
         await supabase.from('game_states').upsert({
             user_id: session.user.id,
-            game_type: 'myndagata',
+            game_type: gameTypeKey,
             state_json: { grid: currentGrid },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -151,11 +161,12 @@ export default function NativeMyndagata() {
             if (session?.user) {
                 try {
                     let elapsed = 60;
-                    const date = new Date().toLocaleDateString('en-CA');
-                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_myndagata_${date}`);
+                    const today = date || new Date().toISOString().split('T')[0];
+                    const isToday = today === new Date().toISOString().split('T')[0];
+                    const savedTime = await AsyncStorage.getItem(`timer_${session.user.id}_myndagata_${today}`);
                     if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
-                    const res = await fetch(`${API_URL}/api/mobile/myndagata`, {
+                    const res = await fetch(`${API_URL}/api/mobile/myndagata?date=${today}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

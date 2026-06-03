@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, Animated as RNAnimated } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -112,6 +112,7 @@ const CardComponent = ({
 };
 
 export default function NativeMinnisspil() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [game, setGame] = useState<MinnisspilGameData | null>(null);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'loading'>('loading');
     
@@ -140,21 +141,24 @@ export default function NativeMinnisspil() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = date || new Date().toISOString().split('T')[0];
                 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/minnisspil/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/minnisspil/init?date=${today}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
+
+                const isToday = today === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'minnisspil' : `minnisspil_${today}`;
 
                 const dbPromises = user ? Promise.all([
                     supabase.from('game_results')
                         .select('score')
                         .eq('user_id', user.id)
                         .eq('game_type', 'minnisspil')
-                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'minnisspil').maybeSingle()
+                        .eq('metadata->>puzzleDate', today).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [resDataRes, stateDataRes]] = await Promise.all([
@@ -172,7 +176,7 @@ export default function NativeMinnisspil() {
                 const resData = resDataRes.data;
                 const stateData = stateDataRes.data;
 
-                if (stateData && stateData.state_json && stateData.updated_at.startsWith(today)) {
+                if (stateData && stateData.state_json) {
                     setTurns(stateData.state_json.turns || 0);
                     setMistakes(stateData.state_json.mistakes || 0);
                     setMatchedIcons(stateData.state_json.matchedIcons || []);
@@ -193,7 +197,7 @@ export default function NativeMinnisspil() {
         }
         init();
         return () => { DeviceEventEmitter.emit('stop-timer'); };
-    }, []);
+    }, [date]);
 
     const completeGame = async (finalMistakes: number) => {
         DeviceEventEmitter.emit('stop-timer');
@@ -202,8 +206,9 @@ export default function NativeMinnisspil() {
         if (!user) return;
 
         let elapsed = 0;
-        const date = new Date().toISOString().split('T')[0];
-        const key = `timer_${user.id}_minnisspil_${date}`;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const key = `timer_${user.id}_minnisspil_${todayStr}`;
         const savedTime = await AsyncStorage.getItem(key);
         if (savedTime) elapsed = parseInt(savedTime, 10);
         
@@ -212,7 +217,7 @@ export default function NativeMinnisspil() {
         const penalty = finalMistakes * 10;
         let bonus = 150 - penalty;
         if (bonus < 0) bonus = 0;
-        const xpReward = 50 + bonus;
+        const xpReward = isToday ? 50 + bonus : 0;
 
         await supabase.from('game_results').insert({
             time_taken_seconds: elapsed,
@@ -220,7 +225,7 @@ export default function NativeMinnisspil() {
             game_type: 'minnisspil',
             score: xpReward, // score is reward, web logic does this via DB insert score: finalReward
             won: true,
-            metadata: { mistakes: finalMistakes, matchedIcons: game?.cards.map(c => c.iconId) } // Web passes metadata
+            metadata: { mistakes: finalMistakes, matchedIcons: game?.cards.map(c => c.iconId), puzzleDate: todayStr } // Web passes metadata
         });
 
         // Clear web state flag!
@@ -263,10 +268,12 @@ export default function NativeMinnisspil() {
     const syncState = async (nextTurns: number, nextMistakes: number, nextMatched: string[], nextFlipped: number[]) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const today = new Date().toISOString().split('T')[0];
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'minnisspil' : `minnisspil_${todayStr}`;
         supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: 'minnisspil',
+            game_type: gameTypeKey,
             state_json: { turns: nextTurns, mistakes: nextMistakes, matchedIcons: nextMatched, flippedIndices: nextFlipped },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();

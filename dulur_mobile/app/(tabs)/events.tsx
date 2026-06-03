@@ -176,7 +176,13 @@ export default function EventsScreen() {
                                         onPress={() => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                                             if (activeEvent && activeEvent.id) {
-                                                router.push(`/game/${activeEvent.id}?isEvent=true` as any);
+                                                const gameTypes = typeof activeEvent.game_types === 'string' ? JSON.parse(activeEvent.game_types) : activeEvent.game_types;
+                                                const currentGameType = gameTypes && gameTypes.length > 0 ? gameTypes[0] : null;
+                                                if (currentGameType) {
+                                                    router.push(`/game/native/${currentGameType}?challengeId=${activeEvent.id}&isEvent=true` as any);
+                                                } else {
+                                                    router.push(`/game/${activeEvent.id}?isEvent=true` as any);
+                                                }
                                             }
                                         }}
                                     >

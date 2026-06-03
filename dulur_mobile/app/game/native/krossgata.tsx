@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, TextInput, DeviceEventEmitter, Share, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
@@ -44,6 +44,7 @@ type CellData = {
 
 
 export default function NativeKrossgata() {
+    const { date, challengeId } = useLocalSearchParams<{ date: string, challengeId?: string }>();
     const [puzzle, setPuzzle] = useState<CrosswordPuzzle | null>(null);
     const [grid, setGrid] = useState<(CellData | null)[][]>([]);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'loading'>('loading');
@@ -100,17 +101,20 @@ export default function NativeKrossgata() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = date || new Date().toISOString().split('T')[0];
 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/krossgata/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/krossgata/init?date=${today}${challengeId ? `&c=${challengeId}` : ''}`).then(res => res.json());
 
                 const [{ data: { session } }, data] = await Promise.all([sessionPromise, apiPromise]);
                 const user = session?.user;
 
+                const isToday = today === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? `krossgata_${data.id}` : `krossgata_${today}`;
+
                 const dbPromises = user ? Promise.all([
-                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'krossgata').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `krossgata_${data.id}`).maybeSingle()
+                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'krossgata').eq('metadata->>puzzleDate', today).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [resDataRes, stateDataRes] = await dbPromises;
@@ -192,7 +196,7 @@ export default function NativeKrossgata() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     const findFirstValidCell = (matrix: (CellData|null)[][], puz: CrosswordPuzzle) => {
         if (puz.across.length > 0) {
@@ -351,21 +355,26 @@ export default function NativeKrossgata() {
         if (!user) return;
 
         let elapsed = 120;
-        const date = new Date().toLocaleDateString('en-CA');
-        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_krossgata_${date}`);
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_krossgata_${todayStr}`);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 120;
+
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const xpReward = isToday ? 100 : 0;
 
         await supabase.from('game_results').insert({
             time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: 'krossgata',
-            score: 100,
+            score: xpReward,
             won: true,
-            metadata: { difficulty: 'large' }
+            metadata: { difficulty: 'large', puzzleDate: todayStr }
         });
 
-        await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: 300, p_locale: 'is' });
-        await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        if (xpReward > 0) {
+            await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: 300, p_locale: 'is' });
+            await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        }
     };
 
     const syncGameState = async (currentGrid: (CellData|null)[][]) => {
@@ -379,9 +388,13 @@ export default function NativeKrossgata() {
             }
         }
 
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? `krossgata_${puzzle.id}` : `krossgata_${todayStr}`;
+
         supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `krossgata_${puzzle.id}`,
+            game_type: gameTypeKey,
             state_json: { userGrid: compactGrid },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();

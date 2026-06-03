@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, PanResponder, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
@@ -62,6 +62,7 @@ const StafaruglCell = React.memo(({ letter, isCurrentDrag, isFound, baseFontSize
 });
 
 export default function NativeStafarugl() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [targetWords, setTargetWords] = useState<string[]>([]);
     const [grid, setGrid] = useState<string[][]>([]);
     const [placements, setPlacements] = useState<any[]>([]);
@@ -122,17 +123,20 @@ export default function NativeStafarugl() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = date || new Date().toISOString().split('T')[0];
 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/stafarugl/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/stafarugl/init?date=${today}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
 
+                const isToday = today === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'stafarugl' : `stafarugl_${today}`;
+
                 const dbPromises = user ? Promise.all([
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'stafarugl').maybeSingle(),
-                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'stafarugl').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
+                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', 'stafarugl').eq('metadata->>puzzleDate', today).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [stateDataRes, resDataRes]] = await Promise.all([
@@ -149,9 +153,20 @@ export default function NativeStafarugl() {
                 const stateData = stateDataRes.data;
                 const resData = resDataRes.data;
                 
-                if (stateData && stateData.updated_at.startsWith(today)) {
-                    setFoundWords(stateData.state_json.foundWords || []);
-                    setFoundPaths(stateData.state_json.foundPaths || []);
+                if (stateData) {
+                    let isValidState = true;
+                    if (!date) {
+                        const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== today) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
+
+                    if (isValidState) {
+                        setFoundWords(stateData.state_json.foundWords || []);
+                        setFoundPaths(stateData.state_json.foundPaths || []);
+                    }
                 }
 
                 if (resData) {
@@ -168,7 +183,7 @@ export default function NativeStafarugl() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     const handleGridMeasure = (e: any) => {
         const { width, height } = e.nativeEvent.layout;
@@ -269,9 +284,12 @@ export default function NativeStafarugl() {
     const syncGameState = async (words: string[], paths: Point[][]) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'stafarugl' : `stafarugl_${todayStr}`;
         await supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `stafarugl`,
+            game_type: gameTypeKey,
             state_json: { foundWords: words, foundPaths: paths },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -282,13 +300,14 @@ export default function NativeStafarugl() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const xpReward = 100;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const xpReward = isToday ? 100 : 0;
         setEarnedXp(xpReward);
         setTimeout(() => setIsFreshGameOver(true), 1000);
 
         let elapsed = 60;
-        const date = new Date().toLocaleDateString('en-CA');
-        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_stafarugl_${date}`);
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_stafarugl_${todayStr}`);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
         await supabase.from('game_results').insert({
@@ -297,11 +316,13 @@ export default function NativeStafarugl() {
             game_type: `stafarugl`,
             score: xpReward,
             won: true,
-            metadata: { words: targetWords.length }
+            metadata: { words: targetWords.length, puzzleDate: todayStr }
         });
 
-        await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
-        await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        if (xpReward > 0) {
+            await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
+            await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        }
     }
 
     if (gameState === 'loading') {

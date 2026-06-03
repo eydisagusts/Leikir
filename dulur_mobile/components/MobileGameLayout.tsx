@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter, AppState, AppStateStatus } from 'react-native';
 import { Animated } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { NativeGameArchiveCalendar } from './NativeGameArchiveCalendar';
 
 interface MobileGameLayoutProps {
     gameId: string;
@@ -17,10 +19,14 @@ interface MobileGameLayoutProps {
 }
 
 export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, gameTitle, isGameOver, scrollEnabled = true, onBack, children }) => {
+    const routerParams = useLocalSearchParams();
+    const routerDate = routerParams.date as string | undefined;
+
     const [top3, setTop3] = useState<any[]>([]);
     const [stats, setStats] = useState<{ played: number; won: number; avgTime: number } | null>(null);
     const [showStats, setShowStats] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
+    const [showArchive, setShowArchive] = useState(false);
     const [timerActive, setTimerActive] = useState(false);
     const [elapsedTime, setElapsedTime] = useState(0);
     const [timerKey, setTimerKey] = useState<string | null>(null);
@@ -110,8 +116,9 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
 
             const { data } = await supabase.auth.getUser();
             const uid = data?.user?.id || 'anon';
-            const date = new Date().toLocaleDateString('en-CA');
-            const key = `timer_${uid}_${gameId}_${date}`;
+            
+            const dateStr = routerDate || new Date().toISOString().split('T')[0];
+            const key = `timer_${uid}_${gameId}_${dateStr}`;
 
             if (isMounted) setTimerKey(key);
 
@@ -131,7 +138,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
         }
         initTimer();
         return () => { isMounted = false; };
-    }, [gameId]);
+    }, [gameId, routerDate]);
 
     // Timer Event Listener (Start/Stop)
     useEffect(() => {
@@ -216,6 +223,17 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                     <View className="absolute inset-x-0 top-0 h-full bg-gradient-to-b from-indigo-50/80 to-transparent" />
                 </View>
 
+                {/* Archive Calendar Modal */}
+                <NativeGameArchiveCalendar 
+                    visible={showArchive} 
+                    onClose={() => setShowArchive(false)} 
+                    currentDate={routerDate || new Date().toISOString().split('T')[0]} 
+                    gameTypeBase={gameId.split('_')[0]}
+                    onSelectDate={(date) => {
+                        router.replace({ pathname: `/game/native/${gameId.split('_')[0]}` as any, params: { date } });
+                    }}
+                />
+
                 {/* Header */}
                 <View className={`flex-row items-center justify-between px-4 pt-4 pb-2 w-full self-center max-w-[500px] z-10 ${isPad ? 'mt-16' : 'mt-6'}`}>
                     <View className="flex-1 items-start">
@@ -240,7 +258,9 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                             <View pointerEvents="none">
                                 <Animated.View style={[xpStyle]} className={`flex-row items-center gap-1.5 bg-[#EAB308] border ${xpBounce ? 'border-[#FDE047]' : 'border-[#CA8A04]'} px-3 py-1.5 rounded-[12px] shadow-sm`}>
                                     <Ionicons name="star" size={12} color="white" />
-                                    <Text className="text-white font-black text-xs">{totalXp}</Text>
+                                    <Text className="text-white font-black text-xs">
+                                        {totalXp.toLocaleString('is-IS')}
+                                    </Text>
                                 </Animated.View>
                             </View>
                         )}
@@ -255,6 +275,9 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                     </View>
                     <TouchableOpacity onPress={() => setShowStats(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
                         <Ionicons name="stats-chart" size={18} color="#64748b" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowArchive(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
+                        <Ionicons name="calendar-outline" size={18} color="#64748b" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setShowHelp(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
                         <Ionicons name="information" size={24} color="#64748b" />
@@ -580,8 +603,21 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                                                         </View>
                                                     </View>
                                                 )}
+                                                {gameId.startsWith('dulmal') && (
+                                                    <View className="pb-4">
+                                                        <View className="space-y-4 mb-6">
+                                                            <Text className="text-gray-600 text-sm font-medium">Þessi íslenski málsháttur hefur verið dulkóðaður. Hver bókstafur stendur fyrir annan bókstaf.</Text>
+                                                            <Text className="text-gray-600 text-sm">• Markmiðið er að afkóða málsháttinn. Smelltu á tölu og skrifaðu inn staf til að giska</Text>
+                                                            <Text className="text-gray-600 text-sm">• Þú hefur þrjú líf. Hvert rangt gisk tekur af þér líf svo farðu varlega.</Text>
+                                                            <View className="bg-muted p-4 rounded-lg mt-4 bg-gray-50 border border-gray-100">
+                                                                <Text className="font-bold mb-2 uppercase text-xs tracking-wider text-muted-foreground text-gray-400">Stigagjöf (XP):</Text>
+                                                                <Text className="text-sm font-medium text-gray-600">Þú færð <Text className="font-bold text-[#1A1A1B]">100 XP</Text> fyrir að leysa þrautina.</Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                )}
                                                 {/* Generic Fallback */}
-                                                {!['ordla', 'stafarugl', 'straumur', 'sudoku', 'hengimadur', 'krossgata', 'tengingar', 'sprengjuleit', 'kviss', 'litakodi', 'minnisspil', 'myndagata', 'samhengi'].some(id => gameId.startsWith(id)) && (
+                                                {!['ordla', 'stafarugl', 'straumur', 'sudoku', 'hengimadur', 'krossgata', 'tengingar', 'sprengjuleit', 'kviss', 'litakodi', 'minnisspil', 'myndagata', 'samhengi', 'dulmal'].some(id => gameId.startsWith(id)) && (
                                                     <Text className="text-gray-600 text-base leading-6">Leystu þrautina og fáðu sem bestan tíma eða flest stig! Gangi þér vel.</Text>
                                                 )}
                                             </ScrollView>

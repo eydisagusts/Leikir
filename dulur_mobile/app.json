@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dulur",
     "slug": "dulur",
-    "version": "1.0.9",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "dulur",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "is.dulur.app",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false

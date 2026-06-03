@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Share, DeviceEventEmitter } from 'react-native';
@@ -27,6 +27,7 @@ type KvissGameData = {
 };
 
 export default function NativeKviss() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [game, setGame] = useState<KvissGameData | null>(null);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'loading'>('loading');
     
@@ -93,10 +94,12 @@ export default function NativeKviss() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const todayStr = date || new Date().toISOString().split('T')[0];
+                const isToday = todayStr === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? `kviss_${todayStr}` : `kviss_${todayStr}`;
                 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/kviss/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/kviss/init?date=${todayStr}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
@@ -106,8 +109,8 @@ export default function NativeKviss() {
                         .select('score')
                         .eq('user_id', user.id)
                         .eq('game_type', 'kviss')
-                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
-                    supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', `kviss_${today}`).maybeSingle()
+                        .eq('metadata->>puzzleDate', todayStr).maybeSingle(),
+                    supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [resDataRes, stateDataRes]] = await Promise.all([
@@ -158,7 +161,7 @@ export default function NativeKviss() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     useEffect(() => {
         if (gameState !== 'playing' || isTransitioning || selectedIdx !== null || !game) return;
@@ -224,10 +227,12 @@ export default function NativeKviss() {
     const syncState = async (nextIndex: number, currentScore: number, qStartedAt: number) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const today = new Date().toISOString().split('T')[0];
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? `kviss_${todayStr}` : `kviss_${todayStr}`;
         supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `kviss_${today}`,
+            game_type: gameTypeKey,
             state_json: { currentIndex: nextIndex, score: currentScore, questionStartedAt: qStartedAt },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();
@@ -240,8 +245,9 @@ export default function NativeKviss() {
         if (!user) return;
 
         let elapsed = 0;
-        const date = new Date().toISOString().split('T')[0];
-        const key = `timer_${user.id}_kviss_${date}`;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const key = `timer_${user.id}_kviss_${todayStr}`;
         const savedTime = await AsyncStorage.getItem(key);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 0;
         
@@ -253,7 +259,7 @@ export default function NativeKviss() {
             game_type: 'kviss',
             score: finalScore,
             won: finalScore === 5,
-            metadata: { finalScore } as any
+            metadata: { finalScore, puzzleDate: todayStr } as any
         });
 
         if (error) {
@@ -266,10 +272,13 @@ export default function NativeKviss() {
         // Removed game_states deletion to preserve state for replay visualization
 
         // XP Reward: 30xp per correct answer
-        const xpReward = finalScore * 30;
+        let xpReward = finalScore * 30;
+        if (!isToday) xpReward = 0;
         if (xpReward > 0) {
             await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
             setEarnedXp(xpReward);
+        } else {
+            setEarnedXp(0);
         }
         setTimeout(() => setIsFreshGameOver(true), 1000);
     };

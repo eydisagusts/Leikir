@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Pressable, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -26,6 +26,7 @@ const KEYBOARD_LAYOUT = [
 ];
 
 export default function NativeHengimadur() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [level, setLevel] = useState<number>(1);
     const [targetWord, setTargetWord] = useState('');
     const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
@@ -84,17 +85,19 @@ export default function NativeHengimadur() {
 
     const initGame = async (l: number) => {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const todayStr = date || new Date().toISOString().split('T')[0];
+            const isToday = todayStr === new Date().toISOString().split('T')[0];
+            const gameTypeKey = isToday ? `hengimadur_${l}` : `hengimadur_${l}_${todayStr}`;
 
             const sessionPromise = supabase.auth.getSession();
-            const apiPromise = fetch(`${API_URL}/api/mobile/hengimadur/init?level=${l}`).then(res => res.json());
+            const apiPromise = fetch(`${API_URL}/api/mobile/hengimadur/init?level=${l}&date=${todayStr}`).then(res => res.json());
 
             const { data: { session } } = await sessionPromise;
             const user = session?.user;
 
             const dbPromises = user ? Promise.all([
-                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).maybeSingle(),
-                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
+                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).eq('metadata->>puzzleDate', todayStr).maybeSingle()
             ]) : Promise.resolve([{ data: null }, { data: null }]);
 
             const [data, [stateDataRes, resDataRes]] = await Promise.all([
@@ -115,9 +118,20 @@ export default function NativeHengimadur() {
             let loadedGuesses: string[] = [];
             let loadedMistakes = 0;
 
-            if (stateData && stateData.updated_at.startsWith(today)) {
-                loadedGuesses = stateData.state_json.guessedLetters || [];
-                loadedMistakes = stateData.state_json.mistakes || 0;
+            if (stateData) {
+                let isValidState = true;
+                if (!date) {
+                    const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                    if (updatedDate !== todayStr) {
+                        isValidState = false;
+                        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                    }
+                }
+
+                if (isValidState) {
+                    loadedGuesses = stateData.state_json.guessedLetters || [];
+                    loadedMistakes = stateData.state_json.mistakes || 0;
+                }
             }
 
             if (resData) {
@@ -141,7 +155,7 @@ export default function NativeHengimadur() {
 
     useEffect(() => {
         initGame(level);
-    }, [level]);
+    }, [level, date]);
 
     const handleKeyPress = async (letter: string) => {
         if (gameState !== 'playing' || guessedLetters.includes(letter)) return;
@@ -184,9 +198,12 @@ export default function NativeHengimadur() {
     const syncGameState = async (guesses: string[], msts: number) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? `hengimadur_${level}` : `hengimadur_${level}_${todayStr}`;
         await supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `hengimadur_${level}`,
+            game_type: gameTypeKey,
             state_json: { guessedLetters: guesses, mistakes: msts },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -195,6 +212,9 @@ export default function NativeHengimadur() {
     const syncTrueResult = async (won: boolean, numMistakes: number) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
 
         const maxMistakes = 6;
         let xpReward = 0;
@@ -206,13 +226,13 @@ export default function NativeHengimadur() {
             const correctCount = Array.from(new Set(targetWord.split(''))).filter(c => guessedLetters.includes(c)).length;
             xpReward = correctCount * 5;
         }
+        if (!isToday) xpReward = 0;
 
         setEarnedXp(xpReward);
         setTimeout(() => setIsFreshGameOver(true), 1000);
 
         let elapsed = 60;
-        const date = new Date().toLocaleDateString('en-CA');
-        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_hengimadur_${level}_${date}`);
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_hengimadur_${level}_${todayStr}`);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
         await supabase.from('game_results').insert({
@@ -221,7 +241,7 @@ export default function NativeHengimadur() {
             game_type: `hengimadur_${level}`,
             score: xpReward,
             won,
-            metadata: { errors: numMistakes }
+            metadata: { errors: numMistakes, puzzleDate: todayStr }
         });
 
         if (xpReward > 0) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, withRepeat, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
@@ -19,6 +19,7 @@ interface Category {
 }
 
 export default function NativeTengingar() {
+    const { date, challengeId } = useLocalSearchParams<{ date: string, challengeId?: string }>();
     const [categories, setCategories] = useState<Category[]>([]);
     const [unsolvedWords, setUnsolvedWords] = useState<string[]>([]);
     const [solvedCategories, setSolvedCategories] = useState<Category[]>([]);
@@ -78,17 +79,19 @@ export default function NativeTengingar() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const todayStr = date || new Date().toISOString().split('T')[0];
+                const isToday = todayStr === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'tengingar' : `tengingar_${todayStr}`;
 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/tengingar/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/tengingar/init?date=${todayStr}${challengeId ? `&c=${challengeId}` : ''}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
 
                 const dbPromises = user ? Promise.all([
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'tengingar').maybeSingle(),
-                    supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', 'tengingar').gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
+                    supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', 'tengingar').eq('metadata->>puzzleDate', todayStr).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [stateDataRes, resDataRes]] = await Promise.all([
@@ -111,10 +114,21 @@ export default function NativeTengingar() {
                 let currentSolved: Category[] = [];
                 let currentMistakes = 0;
 
-                if (stateData && stateData.updated_at.startsWith(today)) {
-                    currentUnsolved = stateData.state_json.unsolvedWords || data.startingBoard;
-                    currentSolved = stateData.state_json.solvedCategories || [];
-                    currentMistakes = stateData.state_json.mistakes || 0;
+                if (stateData) {
+                    let isValidState = true;
+                    if (!date) {
+                        const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== todayStr) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
+
+                    if (isValidState) {
+                        currentUnsolved = stateData.state_json.unsolvedWords || data.startingBoard;
+                        currentSolved = stateData.state_json.solvedCategories || [];
+                        currentMistakes = stateData.state_json.mistakes || 0;
+                    }
                 }
                 if (resData) {
                     setGameState(resData.won ? 'won' : 'lost');
@@ -134,7 +148,7 @@ export default function NativeTengingar() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     const showToast = (msg: string) => {
         setToast(msg);
@@ -247,9 +261,12 @@ export default function NativeTengingar() {
     const syncGameState = async (unsolved: string[], solved: Category[], msts: number) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'tengingar' : `tengingar_${todayStr}`;
         await supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: 'tengingar',
+            game_type: gameTypeKey,
             state_json: { unsolvedWords: unsolved, solvedCategories: solved, mistakes: msts },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -260,11 +277,14 @@ export default function NativeTengingar() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        
         let xpReward = won ? 150 - (numMistakes * 10) : 50;
+        if (!isToday) xpReward = 0;
 
         let elapsed = 60;
-        const date = new Date().toLocaleDateString('en-CA');
-        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_tengingar_${date}`);
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_tengingar_${todayStr}`);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
         await supabase.from('game_results').insert({
@@ -273,7 +293,7 @@ export default function NativeTengingar() {
             game_type: 'tengingar',
             score: xpReward,
             won,
-            metadata: { mistakes: numMistakes }
+            metadata: { mistakes: numMistakes, puzzleDate: todayStr }
         });
 
         if (won) {

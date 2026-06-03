@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Share, DeviceEventEmitter } from 'react-native';
@@ -30,6 +30,7 @@ type CellState = {
 };
 
 export default function NativeSprengjuleit() {
+    const { date, challengeId } = useLocalSearchParams<{ date: string, challengeId?: string }>();
     const [game, setGame] = useState<SprengjuleitGameData | null>(null);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'lost' | 'loading'>('loading');
     
@@ -98,21 +99,24 @@ export default function NativeSprengjuleit() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
-
+                const today = date || new Date().toISOString().split('T')[0];
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/sprengjuleit/init`).then(res => res.json());
+                
+                const apiPromise = fetch(`${API_URL}/api/mobile/sprengjuleit/init?date=${today}${challengeId ? `&c=${challengeId}` : ''}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
+
+                const isToday = today === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'sprengjuleit' : `sprengjuleit_${today}`;
 
                 const dbPromises = user ? Promise.all([
                     supabase.from('game_results')
                         .select('won')
                         .eq('user_id', user.id)
                         .eq('game_type', 'sprengjuleit')
-                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
-                    supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', `sprengjuleit_${today}`).maybeSingle()
+                        .eq('metadata->>puzzleDate', today).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [resDataRes, stateDataRes]] = await Promise.all([
@@ -141,19 +145,32 @@ export default function NativeSprengjuleit() {
                 const resData = resDataRes.data;
                 const stateData = stateDataRes.data;
 
+                let loadedGrid = initialGrid;
+                let isValidState = false;
+
+                if (stateData && stateData.state_json.board) {
+                    isValidState = true;
+                    if (!date) { // Date validation only when playing current live day
+                        const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== today) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
+                }
+
+                if (isValidState) {
+                    loadedGrid = stateData.state_json.board;
+                    setFirstClick(false);
+                    const flags = stateData.state_json.board.flat().filter((c: CellState) => c.isFlagged).length;
+                    setFlagsPlaced(flags);
+                }
+
                 if (resData) {
                     setGameState(resData.won ? 'won' : 'lost');
-                    // Fully map winning/losing grid for show (omitted for brevity, just giving blank grid)
-                    setGrid(initialGrid);
+                    setGrid(loadedGrid);
                 } else {
-                    if (stateData && stateData.state_json.board) {
-                        setGrid(stateData.state_json.board);
-                        setFirstClick(false);
-                        const flags = stateData.state_json.board.flat().filter((c: CellState) => c.isFlagged).length;
-                        setFlagsPlaced(flags);
-                    } else {
-                        setGrid(initialGrid);
-                    }
+                    setGrid(loadedGrid);
                     setGameState('playing');
                 }
             } catch (err) {
@@ -161,7 +178,7 @@ export default function NativeSprengjuleit() {
             }
         }
         init();
-    }, []);
+    }, [date]);
 
     // Deterministic random
     const seededRandom = (seed: number) => {
@@ -311,25 +328,34 @@ export default function NativeSprengjuleit() {
         setGrid(newGrid);
         setGameState('lost');
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            let elapsed = 0;
-            const date = new Date().toISOString().split('T')[0];
-            const key = `timer_${user.id}_sprengjuleit_${date}`;
-            const savedTime = await AsyncStorage.getItem(key);
-            if (savedTime) elapsed = parseInt(savedTime, 10);
-            
-            setFinalTime(elapsed);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                let elapsed = 0;
+                const todayStr = date || new Date().toISOString().split('T')[0];
+                const key = `timer_${user.id}_sprengjuleit_${todayStr}`;
+                const savedTime = await AsyncStorage.getItem(key);
+                if (savedTime) elapsed = parseInt(savedTime, 10);
+                
+                setFinalTime(elapsed);
 
-            await supabase.from('game_results').insert({
-                time_taken_seconds: elapsed,
-                user_id: user.id,
-                game_type: 'sprengjuleit',
-                score: 0,
-                won: false
-            });
+                await supabase.from('game_results').insert({
+                    time_taken_seconds: elapsed,
+                    user_id: user.id,
+                    game_type: 'sprengjuleit',
+                    score: 0,
+                    won: false,
+                    metadata: { difficulty: 'medium', puzzleDate: todayStr }
+                });
+
+                await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+                setEarnedXp(0);
+            }
+        } catch (e) {
+            console.error('Error during loss trigger:', e);
+        } finally {
+            setTimeout(() => setIsFreshGameOver(true), 1000);
         }
-        setTimeout(() => setIsFreshGameOver(true), 1000);
     };
 
     const checkWin = async (currentGrid: CellState[][]) => {
@@ -351,33 +377,41 @@ export default function NativeSprengjuleit() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setGameState('won');
 
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                let elapsed = 0;
-                const date = new Date().toISOString().split('T')[0];
-                const key = `timer_${user.id}_sprengjuleit_${date}`;
-                const savedTime = await AsyncStorage.getItem(key);
-                if (savedTime) elapsed = parseInt(savedTime, 10);
-                
-                setFinalTime(elapsed);
-                
-                // You start with 200XP, max -100XP penalty, dropping by 1 per 3 seconds.
-                const penalty = Math.floor(elapsed / 3);
-                const finalXp = Math.max(100, 200 - penalty);
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    let elapsed = 0;
+                    const todayStr = date || new Date().toISOString().split('T')[0];
+                    const key = `timer_${user.id}_sprengjuleit_${todayStr}`;
+                    const savedTime = await AsyncStorage.getItem(key);
+                    if (savedTime) elapsed = parseInt(savedTime, 10);
+                    
+                    setFinalTime(elapsed);
+                    
+                    // You start with 200XP, max -100XP penalty, dropping by 1 per 3 seconds.
+                    const isToday = todayStr === new Date().toISOString().split('T')[0];
+                    const penalty = Math.floor(elapsed / 3);
+                    const finalXp = isToday ? Math.max(100, 200 - penalty) : 0;
 
-                await supabase.from('game_results').insert({
-                    time_taken_seconds: elapsed,
-                    user_id: user.id,
-                    game_type: 'sprengjuleit',
-                    score: finalXp,
-                    won: true,
-                    metadata: { difficulty: 'medium' }
-                });
-                await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: finalXp, p_locale: 'is' });
+                    await supabase.from('game_results').insert({
+                        time_taken_seconds: elapsed,
+                        user_id: user.id,
+                        game_type: 'sprengjuleit',
+                        score: finalXp,
+                        won: true,
+                        metadata: { difficulty: 'medium', puzzleDate: todayStr }
+                    });
+                    if (finalXp > 0) {
+                        await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: finalXp, p_locale: 'is' });
+                    }
 
-                setEarnedXp(finalXp);
+                    setEarnedXp(finalXp);
+                }
+            } catch (e) {
+                console.error('Error during win trigger:', e);
+            } finally {
+                setTimeout(() => setIsFreshGameOver(true), 1000);
             }
-            setTimeout(() => setIsFreshGameOver(true), 1000);
         }
     };
 
@@ -385,10 +419,12 @@ export default function NativeSprengjuleit() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !game) return;
 
-        const today = new Date().toISOString().split('T')[0];
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'sprengjuleit' : `sprengjuleit_${todayStr}`;
         supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `sprengjuleit_${today}`,
+            game_type: gameTypeKey,
             state_json: { board: cGrid },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();

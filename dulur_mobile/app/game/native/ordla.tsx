@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share, TextInput, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, withTiming, withSequence, withDelay, interpolate, useSharedValue, Easing, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
@@ -88,6 +88,7 @@ function AnimatedCell({ char, state, index, isRevealing, wordLength }: { char: s
 }
 
 export default function NativeOrdla() {
+    const { date, challengeId } = useLocalSearchParams<{ date: string, challengeId?: string }>();
     const [wordLength, setWordLength] = useState<number>(5);
     const MAX_GUESSES = 6;
     
@@ -119,17 +120,19 @@ export default function NativeOrdla() {
     const initGame = async (length: number) => {
         setGameState('loading');
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const todayStr = date || new Date().toISOString().split('T')[0];
+            const isToday = todayStr === new Date().toISOString().split('T')[0];
+            const gameTypeKey = isToday ? `ordla_${length}` : `ordla_${length}_${todayStr}`;
             
             const sessionPromise = supabase.auth.getSession();
-            const apiPromise = fetch(`${API_URL}/api/mobile/ordla/init?length=${length}`).then(res => res.json());
+            const apiPromise = fetch(`${API_URL}/api/mobile/ordla/init?length=${length}&date=${todayStr}${challengeId ? `&challengeId=${challengeId}` : ''}`).then(res => res.json());
 
             const { data: { session } } = await sessionPromise;
             const user = session?.user;
 
             const dbPromises = user ? Promise.all([
-                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `ordla_${length}`).maybeSingle(),
-                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `ordla_${length}`).gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle()
+                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
+                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `ordla_${length}`).eq('metadata->>puzzleDate', todayStr).maybeSingle()
             ]) : Promise.resolve([{ data: null }, { data: null }]);
 
             const [data, [stateRes, resultRes]] = await Promise.all([
@@ -147,8 +150,19 @@ export default function NativeOrdla() {
             const existingState = stateRes.data;
             const existingResult = resultRes.data;
 
-            if (existingState && existingState.updated_at.startsWith(today)) {
-                setGuesses(existingState.state_json.guesses || []);
+            if (existingState) {
+                let isValidState = true;
+                if (!date) {
+                    const updatedDate = new Date(existingState.updated_at).toISOString().split('T')[0];
+                    if (updatedDate !== todayStr) {
+                        isValidState = false;
+                        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                    }
+                }
+                
+                if (isValidState) {
+                    setGuesses(existingState.state_json.guesses || []);
+                }
             }
 
             if (existingResult) {
@@ -173,7 +187,7 @@ export default function NativeOrdla() {
 
     useEffect(() => {
         initGame(wordLength);
-    }, [wordLength]);
+    }, [wordLength, date]);
 
     const showToast = (msg: string) => {
         setToast(msg);
@@ -298,9 +312,12 @@ export default function NativeOrdla() {
     const syncGameState = async (newGuesses: Guess[]) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? `ordla_${wordLength}` : `ordla_${wordLength}_${todayStr}`;
         await supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `ordla_${wordLength}`,
+            game_type: gameTypeKey,
             state_json: { guesses: newGuesses },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -311,15 +328,18 @@ export default function NativeOrdla() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+
         let xpReward = 50;
         if (won) {
             const penalty = (guessList.length - 1) * 15;
             xpReward = Math.max(100, Math.min(220, 100 + (80 - penalty)));
         }
+        if (!isToday) xpReward = 0;
 
         let elapsed = 60;
-        const date = new Date().toLocaleDateString('en-CA');
-        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_ordla_${wordLength}_${date}`);
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_ordla_${wordLength}_${todayStr}`);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
         await supabase.from('game_results').insert({
@@ -328,11 +348,17 @@ export default function NativeOrdla() {
             game_type: `ordla_${wordLength}`,
             score: xpReward,
             won,
-            metadata: { guesses: guessList.length, guessList }
+            metadata: { guesses: guessList.length, guessList, puzzleDate: todayStr }
         });
 
-        await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
-        await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        // Clear the in-progress state explicitly
+        const gameTypeKey = isToday ? `ordla_${wordLength}` : `ordla_${wordLength}_${todayStr}`;
+        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+
+        if (xpReward > 0) {
+            await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
+            await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        }
         setEarnedXp(xpReward);
     }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -42,6 +42,7 @@ const ColorMap: Record<PegColor, string> = {
 };
 
 export default function NativeLitakodi() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [secretCode, setSecretCode] = useState<PegColor[] | null>(null);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'lost' | 'loading'>('loading');
     
@@ -71,21 +72,24 @@ export default function NativeLitakodi() {
     useEffect(() => {
         async function init() {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = date || new Date().toISOString().split('T')[0];
 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/litakodi/init`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/litakodi/init?date=${today}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
+
+                const isToday = today === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? 'litakodi' : `litakodi_${today}`;
 
                 const dbPromises = user ? Promise.all([
                     supabase.from('game_results')
                         .select('won')
                         .eq('user_id', user.id)
                         .eq('game_type', 'litakodi')
-                        .gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', 'litakodi').maybeSingle()
+                        .eq('metadata->>puzzleDate', today).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [resDataRes, stateDataRes]] = await Promise.all([
@@ -103,7 +107,7 @@ export default function NativeLitakodi() {
                 const resData = resDataRes.data;
                 const stateData = stateDataRes.data;
 
-                if (stateData && stateData.state_json && stateData.updated_at.startsWith(today)) {
+                if (stateData && stateData.state_json) {
                     setRows(stateData.state_json.rows || rows);
                     setCurrentRowIndex(stateData.state_json.currentRowIndex || 0);
                 } else if (stateData) {
@@ -123,7 +127,7 @@ export default function NativeLitakodi() {
         }
         init();
         return () => { DeviceEventEmitter.emit('stop-timer'); };
-    }, []);
+    }, [date]);
 
     const completeGame = async (statusArg: 'won' | 'lost', finalRows: RowState[], targetRow: number) => {
         DeviceEventEmitter.emit('stop-timer');
@@ -132,12 +136,13 @@ export default function NativeLitakodi() {
         if (!user) return;
 
         let elapsed = 0;
-        const date = new Date().toISOString().split('T')[0];
-        const key = `timer_${user.id}_litakodi_${date}`;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const key = `timer_${user.id}_litakodi_${todayStr}`;
         const savedTime = await AsyncStorage.getItem(key);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 0;
 
-        const xpReward = statusArg === 'won' ? (100 + ((MAX_GUESSES - (targetRow + 1)) * 20)) : 0;
+        const xpReward = statusArg === 'won' && isToday ? (100 + ((MAX_GUESSES - (targetRow + 1)) * 20)) : 0;
 
         const { error } = await supabase.from('game_results').insert({
             time_taken_seconds: elapsed,
@@ -145,7 +150,7 @@ export default function NativeLitakodi() {
             game_type: 'litakodi',
             score: xpReward,
             won: statusArg === 'won',
-            metadata: { rows: finalRows } as any // Use metadata column for historic data matching Web schema
+            metadata: { rows: finalRows, puzzleDate: todayStr } as any
         });
 
         if (error) {
@@ -196,10 +201,12 @@ export default function NativeLitakodi() {
     const syncState = async (nextRows: RowState[], nextIndex: number) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const today = new Date().toISOString().split('T')[0];
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? 'litakodi' : `litakodi_${todayStr}`;
         supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: 'litakodi',
+            game_type: gameTypeKey,
             state_json: { rows: nextRows, currentRowIndex: nextIndex },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();

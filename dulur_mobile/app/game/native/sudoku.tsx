@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, Easing, withRepeat } from 'react-native-reanimated';
@@ -20,6 +20,7 @@ type SudokuPuzzle = {
 };
 
 export default function NativeSudoku() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [puzzle, setPuzzle] = useState<SudokuPuzzle | null>(null);
     const [difficulty, setDifficulty] = useState('easy');
     const [userGrid, setUserGrid] = useState<number[][]>([]);
@@ -82,10 +83,12 @@ export default function NativeSudoku() {
         async function init(diff: string) {
             setGameState('loading');
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const todayStr = date || new Date().toISOString().split('T')[0];
+                const isToday = todayStr === new Date().toISOString().split('T')[0];
+                const gameTypeKey = isToday ? `sudoku_${diff}` : `sudoku_${diff}_${todayStr}`;
                 
                 const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/sudoku/init?difficulty=${diff}`).then(res => res.json());
+                const apiPromise = fetch(`${API_URL}/api/mobile/sudoku/init?difficulty=${diff}&date=${todayStr}`).then(res => res.json());
 
                 const { data: { session } } = await sessionPromise;
                 const user = session?.user;
@@ -93,8 +96,8 @@ export default function NativeSudoku() {
                 // Fire DB queries only if user exists
                 const dbPromises = user ? Promise.all([
                     supabase.from('profiles').select('xp').eq('id', user.id).maybeSingle(),
-                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `sudoku_${diff}`).gte('played_at', `${today}T00:00:00Z`).order('played_at', { ascending: false }).limit(1).maybeSingle(),
-                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `sudoku_${diff}`).maybeSingle()
+                    supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `sudoku_${diff}`).eq('metadata->>puzzleDate', todayStr).maybeSingle(),
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }, { data: null }]);
 
                 const [data, [profileRes, resDataRes, stateDataRes]] = await Promise.all([
@@ -119,15 +122,26 @@ export default function NativeSudoku() {
                 
                 if (profile) setXpAvailable(profile.xp || 0);
 
-                if (stateData && stateData.updated_at.startsWith(today)) {
-                    setUserGrid(stateData.state_json.currentGrid || curPuz.initial.map((row: any) => [...row]));
-                    setNotes(stateData.state_json.notes || {});
+                if (stateData) {
+                    let isValidState = true;
+                    if (!date) {
+                        const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== todayStr) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
+
+                    if (isValidState) {
+                        setUserGrid(stateData.state_json.currentGrid || curPuz.initial.map((row: any) => [...row]));
+                        setNotes(stateData.state_json.notes || {});
+                    } else {
+                        setUserGrid(curPuz.initial.map((row: any) => [...row]));
+                        setNotes({});
+                    }
                 } else {
                     setUserGrid(curPuz.initial.map((row: any) => [...row]));
                     setNotes({});
-                    if (stateData) {
-                        // Removed game_states deletion to preserve state for replay visualization
-                    }
                 }
 
                 if (resData) {
@@ -141,7 +155,7 @@ export default function NativeSudoku() {
             }
         }
         init(difficulty);
-    }, [difficulty]);
+    }, [difficulty, date]);
 
     const handleHint = async () => {
         if (gameState !== 'playing' || selectedRow === null || selectedCol === null) return;
@@ -322,36 +336,47 @@ export default function NativeSudoku() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         DeviceEventEmitter.emit('stop-timer');
         setGameState('won');
-        setEarnedXp(100);
+
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        
+        let xpReward = 100;
+        if (!isToday) xpReward = 0;
+
+        setEarnedXp(xpReward);
         setTimeout(() => setIsFreshGameOver(true), 1000);
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
         let elapsed = 300;
-        const date = new Date().toLocaleDateString('en-CA');
-        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_sudoku_${difficulty}_${date}`);
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_sudoku_${difficulty}_${todayStr}`);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 300;
 
         await supabase.from('game_results').insert({
             time_taken_seconds: elapsed,
             user_id: user.id,
             game_type: `sudoku_${difficulty}`,
-            score: 100, // Easy default
+            score: xpReward,
             won: true,
-            metadata: { difficulty }
+            metadata: { difficulty, puzzleDate: todayStr }
         });
 
-        await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: 100, p_locale: 'is' });
-        await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        if (xpReward > 0) {
+            await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
+            await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        }
     };
 
     const syncGameState = async (currentGrid: number[][], currentNotes: Record<string, number[]> = notes) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !puzzle) return;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? `sudoku_${difficulty}` : `sudoku_${difficulty}_${todayStr}`;
         supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `sudoku_${difficulty}`,
+            game_type: gameTypeKey,
             state_json: { currentGrid, notes: currentNotes },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' }).then();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, DeviceEventEmitter, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, DeviceEventEmitter, Alert, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,12 +9,15 @@ import { GataWidget } from '@/components/GataWidget';
 
 const { width } = Dimensions.get('window');
 
+const isDulmalNew = new Date() < new Date('2026-06-04');
+
 const BASE_GAMES = [
     { id: 'ordla', name: 'Orðla', desc: 'Finndu orð dagsins í minna en sex tilraunum.', iconType: 'ordla', badge: null },
     { id: 'hengimadur', name: 'Hengimaður', desc: 'Bjargaðu karlinum úr snörunni með því að giska á stafina í orðinu.', iconType: 'hengimadur', badge: null },
     { id: 'sudoku', name: 'Sudoku', desc: 'Settu tölustafina í réttan reit.', iconType: 'sudoku', badge: null },
     { id: 'samhengi', name: 'Samhengi', desc: 'Finndu leyniorðið með því að giska á orð sem tengjast því í samhengi.', iconType: 'samhengi', badge: 'ÁSKRIFT' },
     { id: 'krossreikningur', name: 'Krossreikningur', desc: 'Leystu stærðfræðiþrautir í kross.', iconType: 'krossreikningur', badge: 'ÁSKRIFT' },
+    { id: 'dulmal', name: 'Dulmál', desc: 'Dulkóðaður málsháttur.', iconType: 'dulmal', badge: isDulmalNew ? 'NÝTT' : 'ÁSKRIFT' },
     { id: 'tengingar', name: 'Tengingar', desc: 'Finndu fjóra flokka með fjórum orðum sem tengjast.', iconType: 'tengingar', badge: 'ÁSKRIFT' },
     { id: 'myndagata', name: 'Myndagáta', desc: 'Teiknaðu myndina með því að fylla út í reitina samkvæmt tölunum.', iconType: 'myndagata', badge: 'ÁSKRIFT' },
     { id: 'straumur', name: 'Straumur', desc: 'Dragðu yfir stafina til að finna orðin. Líkt stafarugli en hver stafur tilheyrir orði.', iconType: 'straumur', badge: 'ÁSKRIFT' },
@@ -23,13 +26,42 @@ const BASE_GAMES = [
     { id: 'stafarugl', name: 'Stafarugl', desc: 'Finndu orðin í stafaruglinu.', iconType: 'stafarugl', badge: 'ÁSKRIFT' },
     { id: 'kviss', name: 'Kviss', desc: 'Svaraðu fimm spennandi spurningum dagsins.', iconType: 'kviss', badge: 'ÁSKRIFT' },
     { id: 'litakodi', name: 'Litakóði', desc: 'Reyndu að finna réttan litakóða í 6 eða færri tilraunum.', iconType: 'litakodi', badge: 'ÁSKRIFT' },
-    { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null },
-    { id: 'dulmal', name: 'Dulmál', desc: 'Notaðu rökvísi til að brjóta dulmálið og finna orðið.', iconType: 'dulmal', badge: 'VÆNTANLEGT' }
+    { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null }
 ];
 
 const GAMES = BASE_GAMES;
 
+const GAME_IMAGES: Record<string, any> = {
+    'ordla': require('../../assets/images/games/dulur-ordla.png'),
+    'hengimadur': require('../../assets/images/games/dulur_hengimadur.png'),
+    'sudoku': require('../../assets/images/games/dulur_sudoku.png'),
+    'samhengi': require('../../assets/images/games/dulur_samhengi.png'),
+    'krossreikningur': require('../../assets/images/games/dulur_krossreikningur.png'),
+    'tengingar': require('../../assets/images/games/dulur_tengingar.png'),
+    'myndagata': require('../../assets/images/games/dulur_myndagata.png'),
+    'straumur': require('../../assets/images/games/dulur_straumur.png'),
+    'sprengjuleit': require('../../assets/images/games/dulur_sprengjuleit.png'),
+    'krossgata': require('../../assets/images/games/dulur_krossgata.png'),
+    'stafarugl': require('../../assets/images/games/dulur-stafarugl.png'),
+    'kviss': require('../../assets/images/games/dulur_kviss.png'),
+    'litakodi': require('../../assets/images/games/dulur_litakodi.png'),
+    'minnisspil': require('../../assets/images/games/dulur_minnisspil.png'),
+    'dulmal': require('../../assets/images/games/dulur_dulmal.png'),
+};
+
+
+
 const GameGraphic = React.memo(({ type }: { type: string }) => {
+    const imgSrc = GAME_IMAGES[type];
+    
+    if (imgSrc) {
+        return (
+            <View className="absolute inset-0 bg-white items-center justify-center overflow-hidden">
+                <Image source={imgSrc} style={{ height: '92%', aspectRatio: 1, resizeMode: 'cover', borderRadius: 28 }} />
+            </View>
+        );
+    }
+
     if (type === 'ordla') {
         const row1 = [
             { char: 'S', color: '#3A3A3C' }, { char: 'P', color: '#3A3A3C' },
@@ -434,8 +466,9 @@ const GameCard = React.memo(({
                 <GameGraphic type={game.iconType} />
 
                 {showBadge && (
-                    <View className={`absolute top-3 right-3 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5 ${game.badge === 'VÆNTANLEGT' ? 'bg-white/95 border border-slate-100' : 'bg-indigo-950/90'}`} style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
-                        {game.badge !== 'VÆNTANLEGT' && <Ionicons name="lock-closed" size={10} color="#EAB308" />}
+                    <View className={`absolute top-3 right-3 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5 ${game.badge === 'VÆNTANLEGT' ? 'bg-white/95 border border-slate-100' : (game.badge === 'NÝTT' ? 'bg-rose-500' : 'bg-indigo-950/90')}`} style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
+                        {game.badge !== 'VÆNTANLEGT' && game.badge !== 'NÝTT' && <Ionicons name="lock-closed" size={10} color="#EAB308" />}
+                        {game.badge === 'NÝTT' && <Ionicons name="sparkles" size={10} color="white" />}
                         <Text className={`text-[9px] font-black uppercase tracking-widest leading-none ${game.badge === 'VÆNTANLEGT' ? 'text-indigo-600' : 'text-white'}`}>{game.badge}</Text>
                     </View>
                 )}
@@ -451,8 +484,11 @@ const GameCard = React.memo(({
     return prevProps.game.id === nextProps.game.id && prevProps.isSubscribed === nextProps.isSubscribed;
 });
 
+let savedScrollOffset = 0;
+
 export default function HomeHubScreen() {
     const insets = useSafeAreaInsets();
+    const scrollRef = React.useRef<ScrollView>(null);
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [xp, setXp] = useState(0);
     const [xpBounce, setXpBounce] = useState(false);
@@ -473,7 +509,18 @@ export default function HomeHubScreen() {
             setXpBounce(true);
             setTimeout(() => setXpBounce(false), 800);
         });
+        
+        if (savedScrollOffset > 0) {
+            setTimeout(() => {
+                scrollRef.current?.scrollTo({ y: savedScrollOffset, animated: false });
+            }, 50);
+        }
+
         return () => sub.remove();
+    }, []);
+
+    const handleScroll = React.useCallback((event: any) => {
+        savedScrollOffset = event.nativeEvent.contentOffset.y;
     }, []);
 
     const handleGamePress = React.useCallback((id: string) => {
@@ -498,13 +545,33 @@ export default function HomeHubScreen() {
             );
             return;
         }
+        
+        // Also restrict "NÝTT" games that require sub (e.g. dulmal)
+        if (game?.badge === 'NÝTT' && !isSubscribed && game?.id !== 'ordla' && game?.id !== 'hengimadur' && game?.id !== 'sudoku' && game?.id !== 'minnisspil') {
+            Alert.alert(
+                'Áskrift nauðsynleg',
+                'Þessi leikur er einungis fyrir áskrifendur Dulur.',
+                [
+                    { text: 'Skoða áskrift', onPress: () => router.push('/(tabs)/profile') },
+                    { text: 'Loka', style: 'cancel' }
+                ]
+            );
+            return;
+        }
 
         router.push(`/game/native/${id}` as any);
     }, [isSubscribed]);
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1 bg-[#FAFAFA]" contentContainerStyle={{ paddingBottom: 120, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                ref={scrollRef}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                className="flex-1 bg-[#FAFAFA]" 
+                contentContainerStyle={{ paddingBottom: 120, alignItems: 'center' }} 
+                showsVerticalScrollIndicator={false}
+            >
                 <View className="w-full max-w-[600px]">
                     {/* Header & Motto (Centered 2026 Home Page Style) */}
                 <View className="w-full relative px-6 pt-12 pb-10 flex-col items-center justify-center">

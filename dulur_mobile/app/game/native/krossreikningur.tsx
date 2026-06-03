@@ -38,7 +38,10 @@ function classNames(...classes: (string | undefined | null | false)[]) {
     return classes.filter(Boolean).join(' ');
 }
 
+import { useLocalSearchParams } from 'expo-router';
+
 export default function NativeKrossreikningur() {
+    const { date } = useLocalSearchParams<{ date: string }>();
     const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
     const [gameState, setGameState] = useState<'loading' | 'playing' | 'won' | 'error'>('loading');
     
@@ -57,12 +60,15 @@ export default function NativeKrossreikningur() {
     const initGame = async (diff: 'easy' | 'medium' | 'hard') => {
         setGameState('loading');
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const todayStr = date || new Date().toISOString().split('T')[0];
+            const isToday = todayStr === new Date().toISOString().split('T')[0];
+            const gameTypeKey = isToday ? `krossreikningur_${diff}` : `krossreikningur_${diff}_${todayStr}`;
             const sessionPromise = supabase.auth.getSession();
             
             let puzzles = allPuzzles;
-            if (!puzzles) {
-                puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init?d=${today}`).then(res => res.json());
+            if (!puzzles || puzzles.date !== todayStr) {
+                puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init?date=${todayStr}`).then(res => res.json());
+                puzzles.date = todayStr;
                 setAllPuzzles(puzzles);
             }
 
@@ -70,8 +76,8 @@ export default function NativeKrossreikningur() {
             const user = session?.user;
 
             const dbPromises = user ? Promise.all([
-                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', `krossreikningur_${diff}`).maybeSingle(),
-                supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `krossreikningur`).gte('played_at', `${today}T00:00:00Z`).maybeSingle()
+                supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
+                supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `krossreikningur`).eq('metadata->>date', todayStr).maybeSingle()
             ]) : Promise.resolve([{ data: null }, { data: null }]);
 
             const [stateRes, resultRes] = await dbPromises;
@@ -84,13 +90,23 @@ export default function NativeKrossreikningur() {
                 const existingState = stateRes.data;
 
                 // Check if they won this specific difficulty today
-                const diffResult = await supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `krossreikningur`).eq('metadata->>difficulty', diff).gte('played_at', `${today}T00:00:00Z`).maybeSingle();
+                const diffResult = await supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `krossreikningur`).eq('metadata->>difficulty', diff).eq('metadata->>date', todayStr).maybeSingle();
 
                 if (diffResult.data?.won) {
                     setGameState('won');
                 } else {
                     setGameState('playing');
-                    if (existingState && existingState.updated_at.startsWith(today)) {
+                    
+                    let isValidState = true;
+                    if (existingState && !date) {
+                        const updatedDate = new Date(existingState.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== todayStr) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
+
+                    if (existingState && isValidState) {
                         const saved = existingState.state_json;
                         if (saved.grid) loadedGrid = saved.grid;
                         if (saved.answerBank) loadedBank = saved.answerBank;
@@ -112,7 +128,7 @@ export default function NativeKrossreikningur() {
 
     useEffect(() => {
         initGame(difficulty);
-    }, [difficulty]);
+    }, [difficulty, date]);
 
     const changeDifficulty = (newDiff: 'easy' | 'medium' | 'hard') => {
         if (difficulty === newDiff) return;
@@ -216,9 +232,12 @@ export default function NativeKrossreikningur() {
     const saveState = async (currentGrid: CellData[][], currentBank: BankItem[]) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        const gameTypeKey = isToday ? `krossreikningur_${difficulty}` : `krossreikningur_${difficulty}_${todayStr}`;
         await supabase.from('game_states').upsert({
             user_id: user.id,
-            game_type: `krossreikningur_${difficulty}`,
+            game_type: gameTypeKey,
             state_json: { grid: currentGrid, answerBank: currentBank, difficulty },
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, game_type' });
@@ -314,9 +333,12 @@ export default function NativeKrossreikningur() {
         if (difficulty === 'medium') xpReward = 150;
         if (difficulty === 'hard') xpReward = 250;
 
+        const todayStr = date || new Date().toISOString().split('T')[0];
+        const isToday = todayStr === new Date().toISOString().split('T')[0];
+        if (!isToday) xpReward = 0;
+
         let elapsed = 60;
-        const date = new Date().toLocaleDateString('en-CA');
-        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_krossreikningur_${date}`);
+        const savedTime = await AsyncStorage.getItem(`timer_${user.id}_krossreikningur_${todayStr}`);
         if (savedTime) elapsed = parseInt(savedTime, 10) || 60;
 
         await supabase.from('game_results').insert({
@@ -325,11 +347,17 @@ export default function NativeKrossreikningur() {
             game_type: 'krossreikningur',
             score: xpReward,
             won: true,
-            metadata: { difficulty }
+            metadata: { difficulty, date: todayStr }
         });
 
-        await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
-        await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        // Clear the in-progress state explicitly
+        const gameTypeKey = isToday ? `krossreikningur_${difficulty}` : `krossreikningur_${difficulty}_${todayStr}`;
+        await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+
+        if (xpReward > 0) {
+            await supabase.rpc('increment_xp', { user_id_param: user.id, xp_amount: xpReward, p_locale: 'is' });
+            await supabase.rpc('process_daily_streak', { user_id_param: user.id });
+        }
         setEarnedXp(xpReward);
         DeviceEventEmitter.emit('refresh-stats'); // Immediately update dashboard
     };
