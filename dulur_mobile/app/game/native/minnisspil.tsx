@@ -176,13 +176,22 @@ export default function NativeMinnisspil() {
                 const resData = resDataRes.data;
                 const stateData = stateDataRes.data;
 
-                if (stateData && stateData.state_json) {
-                    setTurns(stateData.state_json.turns || 0);
-                    setMistakes(stateData.state_json.mistakes || 0);
-                    setMatchedIcons(stateData.state_json.matchedIcons || []);
-                    setFlippedIndices(stateData.state_json.flippedIndices || []);
-                } else if (stateData) {
-                    // Removed game_states deletion to preserve state for replay visualization
+                if (stateData) {
+                    let isValidState = true;
+                    if (!date) {
+                        const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== today) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
+
+                    if (isValidState && stateData.state_json) {
+                        setTurns(stateData.state_json.turns || 0);
+                        setMistakes(stateData.state_json.mistakes || 0);
+                        setMatchedIcons(stateData.state_json.matchedIcons || []);
+                        setFlippedIndices(stateData.state_json.flippedIndices || []);
+                    }
                 }
 
                 if (resData) {

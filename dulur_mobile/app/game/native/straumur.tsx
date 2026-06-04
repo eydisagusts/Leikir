@@ -140,15 +140,26 @@ export default function NativeStraumur() {
                     setFoundPaths([...data.themeWords.map((t: any) => t.coords), data.spangram.coords]);
                 } else {
                     if (stateData) {
-                        const words = stateData.state_json.foundWords || [];
-                        const healedPaths = words.map((w: string) => {
-                            if (w === data.spangram.word) return data.spangram.coords;
-                            const t = data.themeWords.find((tw: any) => tw.word === w);
-                            return t ? t.coords : [];
-                        }).filter((p: Coordinate[]) => p.length > 0);
+                        let isValidState = true;
+                        if (!date) {
+                            const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                            if (updatedDate !== today) {
+                                isValidState = false;
+                                await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                            }
+                        }
 
-                        setFoundWords(words);
-                        setFoundPaths(healedPaths);
+                        if (isValidState) {
+                            const words = stateData.state_json.foundWords || [];
+                            const healedPaths = words.map((w: string) => {
+                                if (w === data.spangram.word) return data.spangram.coords;
+                                const t = data.themeWords.find((tw: any) => tw.word === w);
+                                return t ? t.coords : [];
+                            }).filter((p: Coordinate[]) => p.length > 0);
+
+                            setFoundWords(words);
+                            setFoundPaths(healedPaths);
+                        }
                     }
                     setGameState('playing');
                 }
