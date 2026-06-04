@@ -107,11 +107,20 @@ export default function NativeLitakodi() {
                 const resData = resDataRes.data;
                 const stateData = stateDataRes.data;
 
-                if (stateData && stateData.state_json) {
-                    setRows(stateData.state_json.rows || rows);
-                    setCurrentRowIndex(stateData.state_json.currentRowIndex || 0);
-                } else if (stateData) {
-                    // Removed game_states deletion to preserve state for replay visualization
+                if (stateData) {
+                    let isValidState = true;
+                    if (!date) {
+                        const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== today) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
+
+                    if (isValidState && stateData.state_json) {
+                        setRows(stateData.state_json.rows || rows);
+                        setCurrentRowIndex(stateData.state_json.currentRowIndex || 0);
+                    }
                 }
 
                 if (resData) {

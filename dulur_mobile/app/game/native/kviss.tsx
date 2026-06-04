@@ -110,7 +110,7 @@ export default function NativeKviss() {
                         .eq('user_id', user.id)
                         .eq('game_type', 'kviss')
                         .eq('metadata->>puzzleDate', todayStr).maybeSingle(),
-                    supabase.from('game_states').select('state_json').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
+                    supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }]);
 
                 const [data, [resDataRes, stateDataRes]] = await Promise.all([
@@ -128,18 +128,33 @@ export default function NativeKviss() {
                 const resData = resDataRes.data;
                 const stateData = stateDataRes.data;
 
-                if (stateData && stateData.state_json) {
-                    const cur = stateData.state_json.currentIndex || 0;
-                    setCurrentIndex(cur);
-                    setScore(stateData.state_json.score || 0);
+                if (stateData) {
+                    let isValidState = true;
+                    if (!date) {
+                        const updatedDate = new Date(stateData.updated_at).toISOString().split('T')[0];
+                        if (updatedDate !== todayStr) {
+                            isValidState = false;
+                            await supabase.from('game_states').delete().eq('user_id', user.id).eq('game_type', gameTypeKey);
+                        }
+                    }
 
-                    // If uncompleted question exists, check timer
-                    if (cur < 5 && stateData.state_json.questionStartedAt && !resData) {
-                        const qAt = stateData.state_json.questionStartedAt;
-                        const elapsedSec = Math.floor((Date.now() - qAt) / 1000);
-                        const remaining = Math.max(0, 10 - elapsedSec);
-                        setTimeLeft(remaining);
-                        setQuestionStartedAt(qAt);
+                    if (isValidState && stateData.state_json) {
+                        const cur = stateData.state_json.currentIndex || 0;
+                        setCurrentIndex(cur);
+                        setScore(stateData.state_json.score || 0);
+
+                        // If uncompleted question exists, check timer
+                        if (cur < 5 && stateData.state_json.questionStartedAt && !resData) {
+                            const qAt = stateData.state_json.questionStartedAt;
+                            const elapsedSec = Math.floor((Date.now() - qAt) / 1000);
+                            const remaining = Math.max(0, 10 - elapsedSec);
+                            setTimeLeft(remaining);
+                            setQuestionStartedAt(qAt);
+                        } else if (!resData) {
+                            const now = Date.now();
+                            setQuestionStartedAt(now);
+                            setTimeLeft(10);
+                        }
                     } else if (!resData) {
                         const now = Date.now();
                         setQuestionStartedAt(now);
