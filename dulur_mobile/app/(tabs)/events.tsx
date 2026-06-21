@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Animated as NativeAnimated, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Link } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,10 +31,10 @@ export default function EventsScreen() {
         const loadData = async () => {
             const now = new Date().toISOString();
 
-            const sessionPromise = supabase.auth.getSession();
+            const sessionPromise = getFreshSession();
             const eventsResPromise = supabase.from('special_events').select('*').eq('event_type', 'monthly').order('start_date', { ascending: true });
 
-            const [{ data: { session } }, eventsRes] = await Promise.all([sessionPromise, eventsResPromise]);
+            const [session, eventsRes] = await Promise.all([sessionPromise, eventsResPromise]);
             const user = session?.user;
 
             const profileRes = user ? await supabase.from('profiles').select('xp').eq('id', user.id).maybeSingle() : { data: null };

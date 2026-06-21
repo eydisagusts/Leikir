@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Dimensions, DeviceEventEmitter, PanResponder } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -155,7 +155,7 @@ export default function NativeFlaedi() {
     }, [gameState]);
 
     const saveStateToDb = async (currentPaths: Record<string, string[]>) => {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (!session?.user) return;
         const saveFormat: Record<string, { r: number, c: number }[]> = {};
         for (const [color, coords] of Object.entries(currentPaths)) {
@@ -212,7 +212,7 @@ export default function NativeFlaedi() {
         DeviceEventEmitter.emit('stop-timer');
         setIsFreshGameOver(true);
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (session?.user) {
             const today = new Date().toISOString().split('T')[0];
             const key = `timer_${session.user.id}_flaedi_${today}`;

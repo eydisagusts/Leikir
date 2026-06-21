@@ -5,7 +5,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -62,7 +62,7 @@ export default function NativeSamhengi() {
                 const isToday = todayStr === new Date().toISOString().split('T')[0];
                 const gameTypeKey = isToday ? 'samhengi' : `samhengi_${todayStr}`;
 
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await getFreshSession();
                 const apiPromise = fetch(`${API_URL}/api/mobile/samhengi/init?date=${todayStr}${challengeId ? `&c=${challengeId}` : ''}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(async res => {
@@ -152,7 +152,7 @@ export default function NativeSamhengi() {
     }, [guesses, hintsUsed]);
 
     const saveStateToDb = async (currentGuesses?: Guess[], givenUp: boolean = false) => {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (!session?.user) return;
         const todayStr = date || new Date().toISOString().split('T')[0];
         const isToday = todayStr === new Date().toISOString().split('T')[0];
@@ -196,7 +196,7 @@ export default function NativeSamhengi() {
             setIsFreshGameOver(true);
             saveStateToDb(newGuesses);
 
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await getFreshSession();
             if (session?.user) {
                 try {
                     const todayStr = date || new Date().toISOString().split('T')[0];
@@ -306,7 +306,7 @@ export default function NativeSamhengi() {
                             DeviceEventEmitter.emit('stop-timer');
                             saveStateToDb(newGuesses, true);
 
-                            const { data: { session } } = await supabase.auth.getSession();
+                            const session = await getFreshSession();
                             if (session?.user) {
                                 try {
                                     const todayStr = date || new Date().toISOString().split('T')[0];

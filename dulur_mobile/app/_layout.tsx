@@ -8,7 +8,7 @@ import '../global.css';
 import { useColorScheme } from '@/components/useColorScheme';
 // Globally polyfill crypto before supabase loads
 import 'react-native-get-random-values';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import { Text, TextInput } from 'react-native';
 
 import { 
@@ -80,10 +80,10 @@ function RootLayoutNav() {
 
     const checkAuthStatus = async () => {
         try {
-            const { data: { session }, error } = await supabase.auth.getSession();
+            const session = await getFreshSession();
             const isPublicScreen = segments[0] === 'login' || segments[0] === 'signup';
 
-            if (error || !session) {
+            if (!session) {
                 if (!isPublicScreen) router.replace('/login');
             } else if (session && isPublicScreen) {
                 router.replace('/(tabs)');

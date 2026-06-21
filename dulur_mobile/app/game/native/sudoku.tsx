@@ -5,7 +5,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, Easing, withRepeat } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -88,7 +88,7 @@ export default function NativeSudoku() {
                 const isToday = todayStr === new Date().toISOString().split('T')[0];
                 const gameTypeKey = isToday ? `sudoku_${diff}` : `sudoku_${diff}_${todayStr}`;
                 
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await getFreshSession();
                 const apiPromise = fetch(`${API_URL}/api/mobile/sudoku/init?difficulty=${diff}&date=${todayStr}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(res => res.json());

@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Share, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 
@@ -100,7 +100,7 @@ export default function NativeSprengjuleit() {
         async function init() {
             try {
                 const today = date || new Date().toISOString().split('T')[0];
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await getFreshSession();
                 const apiPromise = fetch(`${API_URL}/api/mobile/sprengjuleit/init?date=${today}${challengeId ? `&c=${challengeId}` : ''}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(async res => {

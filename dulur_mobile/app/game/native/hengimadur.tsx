@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -98,7 +98,7 @@ export default function NativeHengimadur() {
             const isToday = todayStr === new Date().toISOString().split('T')[0];
             const gameTypeKey = isToday ? `hengimadur_${l}` : `hengimadur_${l}_${todayStr}`;
 
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await getFreshSession();
             const apiPromise = fetch(`${API_URL}/api/mobile/hengimadur/init?level=${l}&date=${todayStr}`, {
                 headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
             }).then(async res => {

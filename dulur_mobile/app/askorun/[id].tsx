@@ -3,7 +3,7 @@ import { View, ActivityIndicator, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { WebView } from 'react-native-webview';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ChallengeHybridWrapper() {
@@ -30,7 +30,7 @@ export default function ChallengeHybridWrapper() {
   }, []);
 
   const fetchSessionData = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getFreshSession();
     setSessionData(session);
     setReady(true);
   };

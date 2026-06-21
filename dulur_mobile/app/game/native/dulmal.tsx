@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -41,7 +41,7 @@ export default function NativeDulmal() {
         setGameState('loading');
         try {
             const today = date || new Date().toISOString().split('T')[0];
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await getFreshSession();
             const res = await fetch(`${API_URL}/api/mobile/dulmal/init?d=${today}${challengeId ? `&c=${challengeId}` : ''}`, {
                 headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
             });

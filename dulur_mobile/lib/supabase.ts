@@ -24,3 +24,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+
+export async function getFreshSession() {
+    try {
+        await supabase.auth.getUser();
+    } catch (e) {
+        console.error("getUser refresh error:", e);
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    return session;
+}

@@ -5,7 +5,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, withTiming, withSequence, withDelay, interpolate, useSharedValue, Easing, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -132,7 +132,7 @@ export default function NativeOrdla() {
             const isToday = todayStr === new Date().toISOString().split('T')[0];
             const gameTypeKey = isToday ? `ordla_${length}` : `ordla_${length}_${todayStr}`;
             
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await getFreshSession();
                 const apiPromise = fetch(`${API_URL}/api/mobile/ordla/init?length=${length}&date=${todayStr}${challengeId ? `&challengeId=${challengeId}` : ''}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(res => res.json());

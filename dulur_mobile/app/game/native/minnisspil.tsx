@@ -9,7 +9,7 @@ import { DeviceEventEmitter, Share } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dulur.is';
 const { width } = Dimensions.get('window');
@@ -143,7 +143,7 @@ export default function NativeMinnisspil() {
             try {
                 const today = date || new Date().toISOString().split('T')[0];
                 
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await getFreshSession();
                 const apiPromise = fetch(`${API_URL}/api/mobile/minnisspil/init?date=${today}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(async res => {

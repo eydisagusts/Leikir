@@ -5,7 +5,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, withRepeat, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -83,7 +83,7 @@ export default function NativeTengingar() {
                 const isToday = todayStr === new Date().toISOString().split('T')[0];
                 const gameTypeKey = isToday ? 'tengingar' : `tengingar_${todayStr}`;
 
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await getFreshSession();
                 const apiPromise = fetch(`${API_URL}/api/mobile/tengingar/init?date=${todayStr}${challengeId ? `&c=${challengeId}` : ''}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(async res => {

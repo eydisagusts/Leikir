@@ -5,7 +5,7 @@ import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -64,11 +64,11 @@ export default function NativeKrossreikningur() {
             const todayStr = date || new Date().toISOString().split('T')[0];
             const isToday = todayStr === new Date().toISOString().split('T')[0];
             const gameTypeKey = isToday ? `krossreikningur_${diff}` : `krossreikningur_${diff}_${todayStr}`;
-            const sessionPromise = supabase.auth.getSession();
+            const sessionPromise = getFreshSession();
             
             let puzzles = allPuzzles;
             if (!puzzles || puzzles.date !== todayStr) {
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await getFreshSession();
                 puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init?date=${todayStr}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(async res => {
@@ -82,7 +82,7 @@ export default function NativeKrossreikningur() {
                 setAllPuzzles(puzzles);
             }
 
-            const { data: { session } } = await sessionPromise;
+            const session = await sessionPromise;
             const user = session?.user;
 
             const dbPromises = user ? Promise.all([

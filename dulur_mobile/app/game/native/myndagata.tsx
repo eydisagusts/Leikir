@@ -5,7 +5,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout, FadeIn, FadeOut } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -60,7 +60,7 @@ export default function NativeMyndagata() {
             try {
                 const today = date || new Date().toISOString().split('T')[0];
 
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await getFreshSession();
                 const apiPromise = fetch(`${API_URL}/api/mobile/myndagata/init?date=${today}`, {
                     headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
                 }).then(async res => {
@@ -129,7 +129,7 @@ export default function NativeMyndagata() {
     }, [gameState]);
 
     const saveStateToDb = async (currentGrid: CellState[][]) => {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (!session?.user || !puzzleData) return;
 
         const today = date || new Date().toISOString().split('T')[0];
@@ -163,7 +163,7 @@ export default function NativeMyndagata() {
             setEarnedXp(100);
             setIsFreshGameOver(true);
 
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await getFreshSession();
             if (session?.user) {
                 try {
                     let elapsed = 60;

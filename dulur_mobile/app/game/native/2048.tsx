@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MobileGameLayout } from '@/components/MobileGameLayout';
 import { NativeGameEndModal } from '@/components/NativeGameEndModal';
@@ -133,7 +133,7 @@ export default function Native2048() {
     };
 
     const saveStateToDb = async (currentGrid: number[][], currentScore: number) => {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (!session?.user) return;
         await supabase.from('game_states').upsert({
             user_id: session.user.id,
@@ -161,7 +161,7 @@ export default function Native2048() {
             DeviceEventEmitter.emit('stop-timer');
             setIsFreshGameOver(true);
 
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await getFreshSession();
             if (session?.user) {
                 const today = new Date().toISOString().split('T')[0];
                 const key = `timer_${session.user.id}_2048_${today}`;

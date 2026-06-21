@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Switch, TouchableOpacity, TextInput, Alert, ScrollView, Linking, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '@/lib/supabase';
+import { supabase, getFreshSession } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useNavigation } from 'expo-router';
 import * as Device from 'expo-device';
@@ -39,7 +39,7 @@ export default function ProfileScreen() {
     }, [navigation]);
 
     const loadProfile = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         let dbTimerDisabled = null;
         if (session?.user) {
             const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
@@ -73,7 +73,7 @@ export default function ProfileScreen() {
         await AsyncStorage.setItem('dulur_timer_disabled', val ? 'true' : 'false');
         DeviceEventEmitter.emit('timer-preference-changed');
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (session?.user) {
             const { data: profileData } = await supabase.from('profiles').select('notification_settings').eq('id', session.user.id).single();
             const currentNS = (profileData?.notification_settings || {}) as Record<string, any>;
@@ -87,7 +87,7 @@ export default function ProfileScreen() {
             Alert.alert('Villa', 'Lágmark 3 og hámark 20 stafir. Engin bil.');
             return;
         }
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (!session?.user) return;
 
         await supabase.from('profiles').update({ username }).eq('id', session.user.id);
@@ -96,7 +96,7 @@ export default function ProfileScreen() {
     };
 
     const handleSaveNotifications = async (key: string, value: boolean) => {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (!session?.user) return;
 
         let expoPushToken = null;
@@ -182,7 +182,7 @@ export default function ProfileScreen() {
             return;
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getFreshSession();
         if (!session?.user?.email) return;
 
         // Verify current password via standard signInWithPassword
@@ -215,7 +215,7 @@ export default function ProfileScreen() {
                 { text: 'Hætta við', style: 'cancel' },
                 {
                     text: 'Eyða', style: 'destructive', onPress: async () => {
-                        const { data: { session } } = await supabase.auth.getSession();
+                        const session = await getFreshSession();
                         if (session?.user) {
                             try {
                                 await supabase.rpc('delete_user', { payload_user_id: session.user.id });
