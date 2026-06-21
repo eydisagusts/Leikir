@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, DeviceEventEmitter, Alert, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import Svg, { Path, Circle, Polyline, Rect, Text as SvgText, G } from 'react-native-svg';
 import { GataWidget } from '@/components/GataWidget';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -487,37 +488,82 @@ const GameCard = React.memo(({
 let savedScrollOffset = 0;
 
 export default function HomeHubScreen() {
+    const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const scrollRef = React.useRef<ScrollView>(null);
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [xp, setXp] = useState(0);
     const [xpBounce, setXpBounce] = useState(false);
 
-    useEffect(() => {
-        async function fetchSub() {
+    const fetchSub = async () => {
+        try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data } = await supabase.from('profiles').select('is_subscribed, xp').eq('id', user.id).single();
-                if (data?.is_subscribed) setIsSubscribed(true);
-                if (data?.xp) setXp(data.xp);
+                const { data } = await supabase.from('profiles').select('is_subscribed, xp, notification_settings').eq('id', user.id).single();
+                if (data) {
+                    setIsSubscribed(!!data.is_subscribed);
+                    setXp(data.xp || 0);
+                    
+                    const ns = data.notification_settings || {};
+                    if (typeof ns.timer_disabled === 'boolean') {
+                        const saved = await AsyncStorage.getItem('dulur_timer_disabled');
+                        const dbValStr = ns.timer_disabled ? 'true' : 'false';
+                        if (saved !== dbValStr) {
+                            await AsyncStorage.setItem('dulur_timer_disabled', dbValStr);
+                            DeviceEventEmitter.emit('timer-preference-changed');
+                        }
+                    }
+                }
+            } else {
+                setIsSubscribed(false);
+                setXp(0);
             }
+        } catch (err) {
+            console.error('Error fetching subscription/profile in home hub:', err);
         }
+    };
+
+    useEffect(() => {
         fetchSub();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                fetchSub();
+            } else {
+                setIsSubscribed(false);
+                setXp(0);
+            }
+        });
 
         const sub = DeviceEventEmitter.addListener('xp-earned', (earned: number) => {
             setXp(prev => prev + earned);
             setXpBounce(true);
             setTimeout(() => setXpBounce(false), 800);
         });
-        
+
+        const subUpdated = DeviceEventEmitter.addListener('profile-updated', fetchSub);
+        const subRefresh = DeviceEventEmitter.addListener('refresh-stats', fetchSub);
+
         if (savedScrollOffset > 0) {
             setTimeout(() => {
                 scrollRef.current?.scrollTo({ y: savedScrollOffset, animated: false });
             }, 50);
         }
 
-        return () => sub.remove();
+        return () => {
+            subscription.unsubscribe();
+            sub.remove();
+            subUpdated.remove();
+            subRefresh.remove();
+        };
     }, []);
+
+    useEffect(() => {
+        const unsubscribeFocus = navigation.addListener('focus', () => {
+            fetchSub();
+        });
+        return unsubscribeFocus;
+    }, [navigation]);
 
     const handleScroll = React.useCallback((event: any) => {
         savedScrollOffset = event.nativeEvent.contentOffset.y;

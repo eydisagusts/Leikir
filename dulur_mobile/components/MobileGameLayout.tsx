@@ -286,7 +286,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 </View>
 
                 {/* Mobile Timer Pill - Below Title (Matches Mobile Web Layout) */}
-                <View className="w-full items-center mt-16 mb-2 md:mb-4 md:mt-20" style={{ position: 'relative' }}>
+                <View className="w-full items-center mt-16 mb-8 md:mb-10 md:mt-20" style={{ position: 'relative' }}>
                     <View className="flex-row justify-center items-center gap-3">
                         <View className="flex-row items-center bg-[#EEF2FF] border border-[#E0E7FF] px-4 py-2 rounded-full gap-2 shadow-sm">
                             <Ionicons name="time-outline" size={18} color="#4338CA" />

@@ -3,7 +3,7 @@ import { View, Text, Switch, TouchableOpacity, TextInput, Alert, ScrollView, Lin
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -25,10 +25,18 @@ export default function ProfileScreen() {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const router = useRouter();
+    const navigation = useNavigation();
 
     useEffect(() => {
         loadProfile();
     }, []);
+
+    useEffect(() => {
+        const unsubscribeFocus = navigation.addListener('focus', () => {
+            loadProfile();
+        });
+        return unsubscribeFocus;
+    }, [navigation]);
 
     const loadProfile = async () => {
         const { data: { session } } = await supabase.auth.getSession();
