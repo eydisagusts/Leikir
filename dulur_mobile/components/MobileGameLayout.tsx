@@ -286,22 +286,27 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 </View>
 
                 {/* Mobile Timer Pill - Below Title (Matches Mobile Web Layout) */}
-                <View className="w-full flex-row justify-center items-center gap-3 mt-16 mb-2 md:mb-4 md:mt-20">
-                    <View className="flex-row items-center bg-[#EEF2FF] border border-[#E0E7FF] px-4 py-2 rounded-full gap-2 shadow-sm">
-                        <Ionicons name="time-outline" size={18} color="#4338CA" />
-                        <Text className={`text-[#4338CA] ${isTimerDisabled ? 'font-semibold text-sm tracking-wide uppercase' : 'font-mono text-base font-bold tracking-widest'}`}>
-                            {isTimerDisabled ? 'Afslappað' : formatTime(elapsedTime)}
-                        </Text>
+                <View className="w-full items-center mt-16 mb-2 md:mb-4 md:mt-20">
+                    <View className="flex-row justify-center items-center gap-3">
+                        <View className="flex-row items-center bg-[#EEF2FF] border border-[#E0E7FF] px-4 py-2 rounded-full gap-2 shadow-sm">
+                            <Ionicons name="time-outline" size={18} color="#4338CA" />
+                            <Text className={`text-[#4338CA] ${isTimerDisabled ? 'font-semibold text-sm tracking-wide uppercase' : 'font-mono text-base font-bold tracking-widest'}`}>
+                                {isTimerDisabled ? 'Slökkt' : formatTime(elapsedTime)}
+                            </Text>
+                        </View>
+                        <TouchableOpacity onPress={() => setShowStats(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
+                            <Ionicons name="stats-chart" size={18} color="#64748b" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowArchive(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
+                            <Ionicons name="calendar-outline" size={18} color="#64748b" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowHelp(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
+                            <Ionicons name="information" size={24} color="#64748b" />
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => setShowStats(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
-                        <Ionicons name="stats-chart" size={18} color="#64748b" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowArchive(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
-                        <Ionicons name="calendar-outline" size={18} color="#64748b" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowHelp(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
-                        <Ionicons name="information" size={24} color="#64748b" />
-                    </TouchableOpacity>
+                    <Text className="text-[11px] text-slate-500 font-semibold text-center mt-2.5">
+                        {isTimerDisabled ? 'Kveiktu á tímanum í stillingum' : 'Slökktu á tímanum í stillingum'}
+                    </Text>
                 </View>
 
                 {/* Injected Game Child */}

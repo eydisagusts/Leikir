@@ -32,6 +32,7 @@ export default function ProfileScreen() {
 
     const loadProfile = async () => {
         const { data: { session } } = await supabase.auth.getSession();
+        let dbTimerDisabled = null;
         if (session?.user) {
             const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
             if (data) {
@@ -46,16 +47,31 @@ export default function ProfileScreen() {
                 setPushMonthlyEvents(ns.push_monthly_events ?? false);
                 setPushLeaderboardPass(ns.push_leaderboard_pass ?? false);
                 setPushLeaderboardTop3(ns.push_leaderboard_top3 ?? false);
+
+                if (typeof ns.timer_disabled === 'boolean') {
+                    dbTimerDisabled = ns.timer_disabled;
+                }
             }
         }
         const savedTimer = await AsyncStorage.getItem('dulur_timer_disabled');
-        setTimerDisabled(savedTimer === 'true');
+        const finalTimerDisabled = dbTimerDisabled !== null ? dbTimerDisabled : (savedTimer === 'true');
+        setTimerDisabled(finalTimerDisabled);
+        await AsyncStorage.setItem('dulur_timer_disabled', finalTimerDisabled ? 'true' : 'false');
+        DeviceEventEmitter.emit('timer-preference-changed');
     };
 
     const handleToggleTimer = async (val: boolean) => {
         setTimerDisabled(val);
         await AsyncStorage.setItem('dulur_timer_disabled', val ? 'true' : 'false');
         DeviceEventEmitter.emit('timer-preference-changed');
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            const { data: profileData } = await supabase.from('profiles').select('notification_settings').eq('id', session.user.id).single();
+            const currentNS = (profileData?.notification_settings || {}) as Record<string, any>;
+            currentNS.timer_disabled = val;
+            await supabase.from('profiles').update({ notification_settings: currentNS }).eq('id', session.user.id);
+        }
     };
 
     const handleSaveUsername = async () => {
@@ -267,8 +283,8 @@ export default function ProfileScreen() {
                 <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
                     <View className="p-4 flex-row justify-between items-center bg-white">
                         <View className="flex-1 pr-4">
-                            <Text className="font-semibold text-slate-800 text-[16px]">Slökkva á leikjaklukku</Text>
-                            <Text className="text-[12px] text-slate-400 mt-1">Sýnir ekki leikjaklukkuna á meðan spilað er svo þú getir spilað á þínum eigin hraða.</Text>
+                            <Text className="font-semibold text-slate-800 text-[16px]">Slökkva á klukku</Text>
+                            <Text className="text-[12px] text-slate-400 mt-1">Felur leikjaklukkuna í öllum leikjum svo að þú getur spilað í rólegheitum og á þínum eigin hraða.</Text>
                         </View>
                         <Switch value={timerDisabled} onValueChange={handleToggleTimer} trackColor={{ true: '#4f46e5' }} />
                     </View>
