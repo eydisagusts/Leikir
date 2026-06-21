@@ -286,8 +286,8 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 </View>
 
                 {/* Mobile Timer Pill - Below Title (Matches Mobile Web Layout) */}
-                <View className="w-full items-center mt-16 mb-8 md:mb-10 md:mt-20" style={{ position: 'relative' }}>
-                    <View className="flex-row justify-center items-center gap-3">
+                <View className="w-full items-center mt-16 mb-8 md:mb-10 md:mt-20">
+                    <View className="flex-row justify-center items-center gap-3 mb-3">
                         <View className="flex-row items-center bg-[#EEF2FF] border border-[#E0E7FF] px-4 py-2 rounded-full gap-2 shadow-sm">
                             <Ionicons name="time-outline" size={18} color="#4338CA" />
                             <Text className={`text-[#4338CA] ${isTimerDisabled ? 'font-semibold text-sm tracking-wide uppercase' : 'font-mono text-base font-bold tracking-widest'}`}>
@@ -304,7 +304,7 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                             <Ionicons name="information" size={24} color="#64748b" />
                         </TouchableOpacity>
                     </View>
-                    <Text className="text-slate-500 font-semibold text-center" style={{ position: 'absolute', bottom: -20, left: 0, right: 0, fontSize: 10 }}>
+                    <Text className="text-slate-500 font-semibold text-center text-[10px]">
                         {isTimerDisabled ? 'Kveiktu á tímanum í stillingum' : 'Slökktu á tímanum í stillingum'}
                     </Text>
                 </View>

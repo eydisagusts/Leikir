@@ -305,10 +305,10 @@ export default function NativeDulmal() {
                     <View className="flex-1 items-center justify-center p-6 text-center min-h-[300px]">
                         <View className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 items-center w-full max-w-sm">
                             <Ionicons name="lock-closed" size={48} color="#eb3b5a" style={{ marginBottom: 16 }} />
-                            <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Aðgangur Lokaður</Text>
-                            <Text className="text-sm font-medium text-slate-500 mb-2 text-center leading-6">{errorMsg || 'Þessi leikur krefst Dulur+ áskriftar eða netþjónn niðri.'}</Text>
+                            <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Villa kom upp</Text>
+                            <Text className="text-sm font-medium text-slate-500 mb-2 text-center leading-6">{errorMsg || 'Vatn eða netsamband vantar. Vinsamlegast reyndu aftur síðar.'}</Text>
                             <TouchableOpacity onPress={() => router.back()} className="bg-[#1A1A1B] w-full py-4 rounded-full shadow-md items-center mt-6">
-                                <Text className="text-white font-bold text-lg">Til baka í Leiki</Text>
+                                <Text className="text-white font-bold text-lg">Til baka</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

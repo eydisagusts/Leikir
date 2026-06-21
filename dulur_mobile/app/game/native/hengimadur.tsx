@@ -289,10 +289,10 @@ export default function NativeHengimadur() {
                 <View className="flex-1 items-center justify-center min-h-[500px] p-6 text-center">
                     <View className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 items-center w-full max-w-sm">
                         <Ionicons name="lock-closed" size={48} color="#eb3b5a" style={{ marginBottom: 16 }} />
-                        <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Aðgangur Lokaður</Text>
-                        <Text className="text-gray-500 font-medium text-center mb-6 leading-6">Þessi erfiðleikastig krefst Dulur+ áskriftar eða netþjónn niðri.</Text>
+                        <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Villa kom upp</Text>
+                        <Text className="text-gray-500 font-medium text-center mb-6 leading-6">Vatn eða netsamband vantar. Vinsamlegast reyndu aftur síðar.</Text>
                         <TouchableOpacity onPress={() => router.back()} className="bg-[#1A1A1B] w-full py-4 rounded-full shadow-md items-center">
-                            <Text className="text-white font-bold text-lg">Til baka í Leiki</Text>
+                            <Text className="text-white font-bold text-lg">Til baka</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
