@@ -7,10 +7,12 @@ import { useRouter } from 'expo-router';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
     const [profile, setProfile] = useState<any>(null);
     const [username, setUsername] = useState('');
+    const [timerDisabled, setTimerDisabled] = useState(false);
     const [pushDailyGames, setPushDailyGames] = useState(false);
     const [pushFriendRequests, setPushFriendRequests] = useState(false);
     const [pushFriendChallenges, setPushFriendChallenges] = useState(false);
@@ -46,6 +48,14 @@ export default function ProfileScreen() {
                 setPushLeaderboardTop3(ns.push_leaderboard_top3 ?? false);
             }
         }
+        const savedTimer = await AsyncStorage.getItem('dulur_timer_disabled');
+        setTimerDisabled(savedTimer === 'true');
+    };
+
+    const handleToggleTimer = async (val: boolean) => {
+        setTimerDisabled(val);
+        await AsyncStorage.setItem('dulur_timer_disabled', val ? 'true' : 'false');
+        DeviceEventEmitter.emit('timer-preference-changed');
     };
 
     const handleSaveUsername = async () => {
@@ -250,6 +260,18 @@ export default function ProfileScreen() {
                         <Ionicons name="checkmark-circle" size={18} color="#4f46e5" />
                         <Text className="text-indigo-600 font-bold text-[15px]">Vista Breytingar</Text>
                     </TouchableOpacity>
+                </View>
+
+                {/* Leikjastillingar */}
+                <Text className="ml-4 mb-2 text-[13px] font-bold text-slate-500 uppercase tracking-widest">Leikjastillingar</Text>
+                <View className="bg-white rounded-2xl border border-slate-100 mb-8 overflow-hidden shadow-sm" style={{ shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8 }}>
+                    <View className="p-4 flex-row justify-between items-center bg-white">
+                        <View className="flex-1 pr-4">
+                            <Text className="font-semibold text-slate-800 text-[16px]">Slökkva á leikjaklukku</Text>
+                            <Text className="text-[12px] text-slate-400 mt-1">Sýnir ekki leikjaklukkuna á meðan spilað er svo þú getir spilað á þínum eigin hraða.</Text>
+                        </View>
+                        <Switch value={timerDisabled} onValueChange={handleToggleTimer} trackColor={{ true: '#4f46e5' }} />
+                    </View>
                 </View>
 
                 {/* Notifications Group */}

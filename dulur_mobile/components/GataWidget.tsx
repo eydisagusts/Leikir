@@ -32,7 +32,7 @@ export function GataWidget() {
                 }
 
                 // Fetch riddle from server
-                const res = await fetch(`${API_URL}/api/mobile/gatur?locale=is`);
+                const res = await fetch(`${API_URL}/api/mobile/gatur?locale=is&_=${todayDateStr}`);
                 if (res.ok) {
                     const data = await res.json();
                     setGata(data);

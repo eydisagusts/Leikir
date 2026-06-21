@@ -58,7 +58,7 @@ export default function SignupScreen() {
 
             Alert.alert(
                 'Nýskráning tókst!',
-                'Vinsamlegast athugaðu netfangið þitt til að staðfesta aðganginn áður en þú skráir þig inn.',
+                'Aðgangurinn þinn hefur verið stofnaður. Þú getur nú skráð þig inn.',
                 [{ text: 'Í lagi', onPress: () => router.replace('/login') }]
             );
         } catch (e: any) {

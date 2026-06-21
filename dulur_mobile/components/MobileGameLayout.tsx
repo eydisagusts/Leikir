@@ -32,6 +32,24 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
     const [timerKey, setTimerKey] = useState<string | null>(null);
     const [totalXp, setTotalXp] = useState<number>(0);
     const [xpBounce, setXpBounce] = useState(false);
+    const [isTimerDisabled, setIsTimerDisabled] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        const checkPref = async () => {
+            const saved = await AsyncStorage.getItem('dulur_timer_disabled');
+            if (isMounted) {
+                setIsTimerDisabled(saved === 'true');
+            }
+        };
+        checkPref();
+
+        const sub = DeviceEventEmitter.addListener('timer-preference-changed', checkPref);
+        return () => {
+            isMounted = false;
+            sub.remove();
+        };
+    }, []);
     const { width } = useWindowDimensions();
     const isPad = width >= 768;
 
@@ -271,7 +289,9 @@ export const MobileGameLayout: React.FC<MobileGameLayoutProps> = ({ gameId, game
                 <View className="w-full flex-row justify-center items-center gap-3 mt-16 mb-2 md:mb-4 md:mt-20">
                     <View className="flex-row items-center bg-[#EEF2FF] border border-[#E0E7FF] px-4 py-2 rounded-full gap-2 shadow-sm">
                         <Ionicons name="time-outline" size={18} color="#4338CA" />
-                        <Text className="text-[#4338CA] font-mono text-base font-bold tracking-widest">{formatTime(elapsedTime)}</Text>
+                        <Text className={`text-[#4338CA] ${isTimerDisabled ? 'font-semibold text-sm tracking-wide uppercase' : 'font-mono text-base font-bold tracking-widest'}`}>
+                            {isTimerDisabled ? 'Afslappað' : formatTime(elapsedTime)}
+                        </Text>
                     </View>
                     <TouchableOpacity onPress={() => setShowStats(true)} className="w-10 h-10 bg-white border border-gray-200 rounded-full items-center justify-center shadow-sm">
                         <Ionicons name="stats-chart" size={18} color="#64748b" />
