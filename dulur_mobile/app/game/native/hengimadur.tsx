@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Pressable, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, ActivityIndicator, Dimensions, DeviceEventEmitter, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +32,7 @@ export default function NativeHengimadur() {
     const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
     const [gameState, setGameState] = useState<'playing' | 'won' | 'lost' | 'loading' | 'error'>('loading');
     const [mistakes, setMistakes] = useState(0);
+    const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
 
     const [earnedXp, setEarnedXp] = useState<number | null>(null);
     const [showFlyXp, setShowFlyXp] = useState(false);
@@ -77,6 +78,14 @@ export default function NativeHengimadur() {
 
     const handleLevelChange = (newLevel: number) => {
         if (newLevel === level) return;
+        if ((newLevel === 2 || newLevel === 3) && isSubscribed !== true) {
+            Alert.alert(
+                'Áskrift nauðsynleg',
+                'Þetta erfiðleikastig krefst Dulur+ áskriftar.',
+                [{ text: 'Skoða áskrift', onPress: () => router.push('/(tabs)/profile' as any) }, { text: 'Loka', style: 'cancel' }]
+            );
+            return;
+        }
         setGameState('loading');
         setGuessedLetters([]);
         setMistakes(0);
@@ -89,24 +98,40 @@ export default function NativeHengimadur() {
             const isToday = todayStr === new Date().toISOString().split('T')[0];
             const gameTypeKey = isToday ? `hengimadur_${l}` : `hengimadur_${l}_${todayStr}`;
 
-            const sessionPromise = supabase.auth.getSession();
-            const apiPromise = fetch(`${API_URL}/api/mobile/hengimadur/init?level=${l}&date=${todayStr}`).then(res => res.json());
-
-            const { data: { session } } = await sessionPromise;
+            const { data: { session } } = await supabase.auth.getSession();
+            const apiPromise = fetch(`${API_URL}/api/mobile/hengimadur/init?level=${l}&date=${todayStr}`, {
+                headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+            }).then(async res => {
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || 'Failed to load game');
+                }
+                return res.json();
+            });
             const user = session?.user;
 
             const dbPromises = user ? Promise.all([
                 supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
-                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).eq('metadata->>puzzleDate', todayStr).maybeSingle()
-            ]) : Promise.resolve([{ data: null }, { data: null }]);
+                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `hengimadur_${l}`).eq('metadata->>puzzleDate', todayStr).maybeSingle(),
+                supabase.from('profiles').select('is_subscribed').eq('id', user.id).maybeSingle()
+            ]) : Promise.resolve([{ data: null }, { data: null }, { data: null }]);
 
-            const [data, [stateDataRes, resDataRes]] = await Promise.all([
+            const [data, [stateDataRes, resDataRes, profileRes]] = await Promise.all([
                 apiPromise,
                 dbPromises
             ]);
             
             setTargetWord(data.targetWord);
             
+            const userIsSubscribed = !!profileRes?.data?.is_subscribed;
+            if (user) setIsSubscribed(userIsSubscribed);
+            else setIsSubscribed(false);
+
+            if ((l === 2 || l === 3) && (!user || !userIsSubscribed)) {
+                setGameState('error');
+                return;
+            }
+
             if (!user) {
                 setGameState('playing'); 
                 return; 
@@ -284,9 +309,11 @@ export default function NativeHengimadur() {
                         </Pressable>
                         <Pressable onPress={() => handleLevelChange(2)} className={`px-5 py-3 rounded-full flex-row items-center gap-1.5 ${level === 2 ? 'bg-white shadow-sm' : ''}`}>
                             <Text className={`font-bold text-sm ${level === 2 ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>Miðlungs</Text>
+                            {isSubscribed !== true && <Ionicons name="lock-closed" size={14} color="#9ca3af" />}
                         </Pressable>
                         <Pressable onPress={() => handleLevelChange(3)} className={`px-5 py-3 rounded-full flex-row items-center gap-1.5 ${level === 3 ? 'bg-white shadow-sm' : ''}`}>
                             <Text className={`font-bold text-sm ${level === 3 ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>Langt</Text>
+                            {isSubscribed !== true && <Ionicons name="lock-closed" size={14} color="#9ca3af" />}
                         </Pressable>
                     </View>
             </View>

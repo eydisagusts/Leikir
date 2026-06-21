@@ -30,6 +30,7 @@ type LevelData = {
     easy: PuzzleData;
     medium: PuzzleData;
     hard: PuzzleData;
+    date?: string;
 };
 
 type BankItem = { id: number; val: number; used: boolean };
@@ -67,8 +68,17 @@ export default function NativeKrossreikningur() {
             
             let puzzles = allPuzzles;
             if (!puzzles || puzzles.date !== todayStr) {
-                puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init?date=${todayStr}`).then(res => res.json());
-                puzzles.date = todayStr;
+                const { data: { session } } = await supabase.auth.getSession();
+                puzzles = await fetch(`${API_URL}/api/mobile/krossreikningur/init?date=${todayStr}`, {
+                    headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+                }).then(async res => {
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || 'Failed to load game');
+                    }
+                    return res.json();
+                });
+                puzzles!.date = todayStr;
                 setAllPuzzles(puzzles);
             }
 

@@ -60,10 +60,16 @@ export default function NativeMyndagata() {
             try {
                 const today = date || new Date().toISOString().split('T')[0];
 
-                const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/myndagata/init?date=${today}`).then(res => res.json());
-
-                const { data: { session } } = await sessionPromise;
+                const { data: { session } } = await supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/myndagata/init?date=${today}`, {
+                    headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+                }).then(async res => {
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || 'Failed to load game');
+                    }
+                    return res.json();
+                });
                 const user = session?.user;
 
                 const isToday = today === new Date().toISOString().split('T')[0];
@@ -259,12 +265,15 @@ export default function NativeMyndagata() {
 
     if (gameState === 'error' || !puzzleData) {
         return (
-            <SafeAreaView className="flex-1 bg-[#FAFAFA] justify-center items-center">
-                <Ionicons name="cloud-offline" size={64} color="#94a3b8" />
-                <Text className="mt-4 text-slate-500 font-semibold text-lg">Gat ekki hlaðið leik</Text>
-                <TouchableOpacity onPress={() => router.replace('/(tabs)')} className="mt-8 bg-[#1e1b4b] px-6 py-3 rounded-full">
-                    <Text className="text-white font-bold">Aftur á forsíðu</Text>
-                </TouchableOpacity>
+            <SafeAreaView className="flex-1 bg-[#FAFAFA] justify-center items-center p-6">
+                <View className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 items-center w-full max-w-sm">
+                    <Ionicons name="lock-closed" size={48} color="#eb3b5a" style={{ marginBottom: 16 }} />
+                    <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Aðgangur Lokaður</Text>
+                    <Text className="text-sm font-medium text-slate-500 mb-2 text-center leading-6">Þessi leikur krefst Dulur+ áskriftar eða netþjónn niðri.</Text>
+                    <TouchableOpacity onPress={() => router.back()} className="bg-[#1A1A1B] w-full py-4 rounded-full shadow-md items-center mt-6">
+                        <Text className="text-white font-bold text-lg">Til baka í Leiki</Text>
+                    </TouchableOpacity>
+                </View>
             </SafeAreaView>
         );
     }

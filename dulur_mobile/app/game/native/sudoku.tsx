@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +35,7 @@ export default function NativeSudoku() {
     const [earnedXp, setEarnedXp] = useState<number | null>(null);
     const [showFlyXp, setShowFlyXp] = useState(false);
     const [isFreshGameOver, setIsFreshGameOver] = useState(false);
+    const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
 
     const xpAnimY = useSharedValue(0);
     const xpAnimOpacity = useSharedValue(1);
@@ -87,15 +88,15 @@ export default function NativeSudoku() {
                 const isToday = todayStr === new Date().toISOString().split('T')[0];
                 const gameTypeKey = isToday ? `sudoku_${diff}` : `sudoku_${diff}_${todayStr}`;
                 
-                const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/sudoku/init?difficulty=${diff}&date=${todayStr}`).then(res => res.json());
-
-                const { data: { session } } = await sessionPromise;
+                const { data: { session } } = await supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/sudoku/init?difficulty=${diff}&date=${todayStr}`, {
+                    headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+                }).then(res => res.json());
                 const user = session?.user;
 
                 // Fire DB queries only if user exists
                 const dbPromises = user ? Promise.all([
-                    supabase.from('profiles').select('xp').eq('id', user.id).maybeSingle(),
+                    supabase.from('profiles').select('xp, is_subscribed').eq('id', user.id).maybeSingle(),
                     supabase.from('game_results').select('won').eq('user_id', user.id).eq('game_type', `sudoku_${diff}`).eq('metadata->>puzzleDate', todayStr).maybeSingle(),
                     supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle()
                 ]) : Promise.resolve([{ data: null }, { data: null }, { data: null }]);
@@ -109,6 +110,15 @@ export default function NativeSudoku() {
                 setPuzzle(curPuz);
                 setDifficulty(data.difficulty);
                 setNotes({});
+
+                const userIsSubscribed = !!profileRes?.data?.is_subscribed;
+                if (user) setIsSubscribed(userIsSubscribed);
+                else setIsSubscribed(false);
+
+                if (diff !== 'easy' && (!user || !userIsSubscribed)) {
+                    setGameState('error');
+                    return;
+                }
 
                 if (!user) {
                     setUserGrid(curPuz.initial.map((row: any) => [...row]));
@@ -189,6 +199,14 @@ export default function NativeSudoku() {
 
     const handleLevelChange = (diff: string) => {
         if (difficulty === diff) return;
+        if (diff !== 'easy' && isSubscribed !== true) {
+            Alert.alert(
+                'Áskrift nauðsynleg',
+                'Þetta erfiðleikastig krefst Dulur+ áskriftar.',
+                [{ text: 'Skoða áskrift', onPress: () => router.push('/(tabs)/profile' as any) }, { text: 'Loka', style: 'cancel' }]
+            );
+            return;
+        }
         setGameState('loading');
         setUserGrid([]);
         setNotes({});
@@ -445,6 +463,7 @@ export default function NativeSudoku() {
                             activeOpacity={0.7}
                         >
                             <Text className={`font-bold text-sm ${difficulty === mode.id ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>{mode.lbl}</Text>
+                             {mode.id !== 'easy' && isSubscribed !== true && <Ionicons name="lock-closed" size={14} color="#9ca3af" />}
                         </TouchableOpacity>
                     ))}
                 </View>

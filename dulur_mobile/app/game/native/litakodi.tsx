@@ -44,7 +44,7 @@ const ColorMap: Record<PegColor, string> = {
 export default function NativeLitakodi() {
     const { date } = useLocalSearchParams<{ date: string }>();
     const [secretCode, setSecretCode] = useState<PegColor[] | null>(null);
-    const [gameState, setGameState] = useState<'playing' | 'won' | 'lost' | 'loading'>('loading');
+    const [gameState, setGameState] = useState<'playing' | 'won' | 'lost' | 'loading' | 'error'>('loading');
     
     const [rows, setRows] = useState<RowState[]>(() => {
         return Array(MAX_GUESSES).fill(null).map(() => ({
@@ -74,10 +74,16 @@ export default function NativeLitakodi() {
             try {
                 const today = date || new Date().toISOString().split('T')[0];
 
-                const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/litakodi/init?date=${today}`).then(res => res.json());
-
-                const { data: { session } } = await sessionPromise;
+                const { data: { session } } = await supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/litakodi/init?date=${today}`, {
+                    headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+                }).then(async res => {
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || 'Failed to load game');
+                    }
+                    return res.json();
+                });
                 const user = session?.user;
 
                 const isToday = today === new Date().toISOString().split('T')[0];
@@ -131,7 +137,7 @@ export default function NativeLitakodi() {
                     setGameState('playing');
                 }
             } catch (err) {
-                setGameState('playing');
+                setGameState('error');
             }
         }
         init();
@@ -345,6 +351,22 @@ export default function NativeLitakodi() {
             <View className="flex-1 bg-[#FAFAFA] items-center justify-center">
                 <ActivityIndicator size="large" color="#1A1A1B" />
             </View>
+        );
+    }
+
+    if (gameState === 'error') {
+        return (
+            <SafeAreaView className="flex-1 bg-[#FAFAFA] items-center justify-center p-6 text-center" edges={['top', 'bottom']}>
+                <Stack.Screen options={{ headerShown: false }} />
+                <View className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 items-center w-full max-w-sm">
+                    <Ionicons name="lock-closed" size={48} color="#eb3b5a" style={{ marginBottom: 16 }} />
+                    <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Aðgangur Lokaður</Text>
+                    <Text className="text-gray-500 font-medium text-center mb-6 leading-6">Þessi leikur krefst Dulur+ áskriftar eða netþjónn niðri.</Text>
+                    <TouchableOpacity onPress={() => router.back()} className="bg-[#1A1A1B] w-full py-4 rounded-full shadow-md items-center">
+                        <Text className="text-white font-bold text-lg">Til baka í Leiki</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
         );
     }
 

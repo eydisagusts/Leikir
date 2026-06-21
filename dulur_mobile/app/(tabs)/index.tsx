@@ -15,18 +15,18 @@ const BASE_GAMES = [
     { id: 'ordla', name: 'Orðla', desc: 'Finndu orð dagsins í minna en sex tilraunum.', iconType: 'ordla', badge: null },
     { id: 'hengimadur', name: 'Hengimaður', desc: 'Bjargaðu karlinum úr snörunni með því að giska á stafina í orðinu.', iconType: 'hengimadur', badge: null },
     { id: 'sudoku', name: 'Sudoku', desc: 'Settu tölustafina í réttan reit.', iconType: 'sudoku', badge: null },
-    { id: 'samhengi', name: 'Samhengi', desc: 'Finndu leyniorðið með því að giska á orð sem tengjast því í samhengi.', iconType: 'samhengi', badge: 'ÁSKRIFT' },
-    { id: 'krossreikningur', name: 'Krossreikningur', desc: 'Leystu stærðfræðiþrautir í kross.', iconType: 'krossreikningur', badge: 'ÁSKRIFT' },
-    { id: 'dulmal', name: 'Dulmál', desc: 'Dulkóðaður málsháttur.', iconType: 'dulmal', badge: isDulmalNew ? 'NÝTT' : 'ÁSKRIFT' },
-    { id: 'tengingar', name: 'Tengingar', desc: 'Finndu fjóra flokka með fjórum orðum sem tengjast.', iconType: 'tengingar', badge: 'ÁSKRIFT' },
-    { id: 'myndagata', name: 'Myndagáta', desc: 'Teiknaðu myndina með því að fylla út í reitina samkvæmt tölunum.', iconType: 'myndagata', badge: 'ÁSKRIFT' },
-    { id: 'straumur', name: 'Straumur', desc: 'Dragðu yfir stafina til að finna orðin. Líkt stafarugli en hver stafur tilheyrir orði.', iconType: 'straumur', badge: 'ÁSKRIFT' },
-    { id: 'sprengjuleit', name: 'Sprengjuleit', desc: 'Finndu földu sprengjurnar.', iconType: 'sprengjuleit', badge: 'ÁSKRIFT' },
-    { id: 'krossgata', name: 'Krossgáta', desc: 'Klassísk krossgáta', iconType: 'krossgata', badge: 'ÁSKRIFT' },
-    { id: 'stafarugl', name: 'Stafarugl', desc: 'Finndu orðin í stafaruglinu.', iconType: 'stafarugl', badge: 'ÁSKRIFT' },
-    { id: 'kviss', name: 'Kviss', desc: 'Svaraðu fimm spennandi spurningum dagsins.', iconType: 'kviss', badge: 'ÁSKRIFT' },
-    { id: 'litakodi', name: 'Litakóði', desc: 'Reyndu að finna réttan litakóða í 6 eða færri tilraunum.', iconType: 'litakodi', badge: 'ÁSKRIFT' },
-    { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: null }
+    { id: 'samhengi', name: 'Samhengi', desc: 'Finndu leyniorðið með því að giska á orð sem tengjast því í samhengi.', iconType: 'samhengi', badge: 'Áskrift' },
+    { id: 'krossreikningur', name: 'Krossreikningur', desc: 'Leystu stærðfræðiþrautir í kross.', iconType: 'krossreikningur', badge: 'Áskrift' },
+    { id: 'dulmal', name: 'Dulmál', desc: 'Dulkóðaður málsháttur.', iconType: 'dulmal', badge: isDulmalNew ? 'NÝTT' : 'Áskrift' },
+    { id: 'tengingar', name: 'Tengingar', desc: 'Finndu fjóra flokka með fjórum orðum sem tengjast.', iconType: 'tengingar', badge: 'Áskrift' },
+    { id: 'myndagata', name: 'Myndagáta', desc: 'Teiknaðu myndina með því að fylla út í reitina samkvæmt tölunum.', iconType: 'myndagata', badge: 'Áskrift' },
+    { id: 'straumur', name: 'Straumur', desc: 'Dragðu yfir stafina til að finna orðin. Líkt stafarugli en hver stafur tilheyrir orði.', iconType: 'straumur', badge: 'Áskrift' },
+    { id: 'sprengjuleit', name: 'Sprengjuleit', desc: 'Finndu földu sprengjurnar.', iconType: 'sprengjuleit', badge: 'Áskrift' },
+    { id: 'krossgata', name: 'Krossgáta', desc: 'Klassísk krossgáta', iconType: 'krossgata', badge: 'Áskrift' },
+    { id: 'stafarugl', name: 'Stafarugl', desc: 'Finndu orðin í stafaruglinu.', iconType: 'stafarugl', badge: 'Áskrift' },
+    { id: 'kviss', name: 'Kviss', desc: 'Svaraðu fimm spennandi spurningum dagsins.', iconType: 'kviss', badge: 'Áskrift' },
+    { id: 'litakodi', name: 'Litakóði', desc: 'Reyndu að finna réttan litakóða í 6 eða færri tilraunum.', iconType: 'litakodi', badge: 'Áskrift' },
+    { id: 'minnisspil', name: 'Minnisspil', desc: 'Finndu öll pörin í sem fæstum tilraunum.', iconType: 'minnisspil', badge: 'Áskrift' }
 ];
 
 const GAMES = BASE_GAMES;
@@ -469,7 +469,7 @@ const GameCard = React.memo(({
                     <View className={`absolute top-3 right-3 px-2.5 py-1.5 rounded-xl flex-row items-center gap-1.5 ${game.badge === 'VÆNTANLEGT' ? 'bg-white/95 border border-slate-100' : (game.badge === 'NÝTT' ? 'bg-rose-500' : 'bg-indigo-950/90')}`} style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}>
                         {game.badge !== 'VÆNTANLEGT' && game.badge !== 'NÝTT' && <Ionicons name="lock-closed" size={10} color="#EAB308" />}
                         {game.badge === 'NÝTT' && <Ionicons name="sparkles" size={10} color="white" />}
-                        <Text className={`text-[9px] font-black uppercase tracking-widest leading-none ${game.badge === 'VÆNTANLEGT' ? 'text-indigo-600' : 'text-white'}`}>{game.badge}</Text>
+                        <Text className={`text-[9px] font-black tracking-widest leading-none ${game.badge === 'VÆNTANLEGT' ? 'text-indigo-600' : 'text-white'}`}>{game.badge}</Text>
                     </View>
                 )}
             </View>
@@ -534,7 +534,7 @@ export default function HomeHubScreen() {
             return;
         }
         
-        if (game?.badge === 'ÁSKRIFT' && !isSubscribed) {
+        if (game?.badge === 'Áskrift' && !isSubscribed) {
             Alert.alert(
                 'Áskrift nauðsynleg',
                 'Þessi leikur er einungis fyrir áskrifendur Dulur.',
@@ -547,7 +547,7 @@ export default function HomeHubScreen() {
         }
         
         // Also restrict "NÝTT" games that require sub (e.g. dulmal)
-        if (game?.badge === 'NÝTT' && !isSubscribed && game?.id !== 'ordla' && game?.id !== 'hengimadur' && game?.id !== 'sudoku' && game?.id !== 'minnisspil') {
+        if (game?.badge === 'NÝTT' && !isSubscribed && game?.id !== 'ordla' && game?.id !== 'hengimadur' && game?.id !== 'sudoku') {
             Alert.alert(
                 'Áskrift nauðsynleg',
                 'Þessi leikur er einungis fyrir áskrifendur Dulur.',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share, TextInput, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, Pressable, TouchableOpacity, ActivityIndicator, Dimensions, DeviceEventEmitter, Share, TextInput, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,15 +99,23 @@ export default function NativeOrdla() {
     const [gameState, setGameState] = useState<'playing' | 'won' | 'lost' | 'loading' | 'error'>('loading');
     const [isRevealing, setIsRevealing] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
+    const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
 
     const inputRef = useRef<TextInput>(null);
 
     const [earnedXp, setEarnedXp] = useState<number | null>(null);
     const [showFlyXp, setShowFlyXp] = useState(false);
     const [isFreshGameOver, setIsFreshGameOver] = useState(false);
-
     const handleWordLengthChange = (len: number) => {
         if (len === wordLength) return;
+        if (len > 5 && isSubscribed !== true) {
+            Alert.alert(
+                'Áskrift nauðsynleg',
+                'Þetta erfiðleikastig krefst Dulur+ áskriftar.',
+                [{ text: 'Skoða áskrift', onPress: () => router.push('/(tabs)/profile' as any) }, { text: 'Loka', style: 'cancel' }]
+            );
+            return;
+        }
         setGameState('loading');
         setGuesses([]);
         setCurrentGuess('');
@@ -124,18 +132,19 @@ export default function NativeOrdla() {
             const isToday = todayStr === new Date().toISOString().split('T')[0];
             const gameTypeKey = isToday ? `ordla_${length}` : `ordla_${length}_${todayStr}`;
             
-            const sessionPromise = supabase.auth.getSession();
-            const apiPromise = fetch(`${API_URL}/api/mobile/ordla/init?length=${length}&date=${todayStr}${challengeId ? `&challengeId=${challengeId}` : ''}`).then(res => res.json());
-
-            const { data: { session } } = await sessionPromise;
+            const { data: { session } } = await supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/ordla/init?length=${length}&date=${todayStr}${challengeId ? `&challengeId=${challengeId}` : ''}`, {
+                    headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+                }).then(res => res.json());
             const user = session?.user;
 
             const dbPromises = user ? Promise.all([
                 supabase.from('game_states').select('state_json, updated_at').eq('user_id', user.id).eq('game_type', gameTypeKey).maybeSingle(),
-                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `ordla_${length}`).eq('metadata->>puzzleDate', todayStr).maybeSingle()
-            ]) : Promise.resolve([{ data: null }, { data: null }]);
+                supabase.from('game_results').select('won, metadata').eq('user_id', user.id).eq('game_type', `ordla_${length}`).eq('metadata->>puzzleDate', todayStr).maybeSingle(),
+                supabase.from('profiles').select('is_subscribed').eq('id', user.id).maybeSingle()
+            ]) : Promise.resolve([{ data: null }, { data: null }, { data: null }]);
 
-            const [data, [stateRes, resultRes]] = await Promise.all([
+            const [data, [stateRes, resultRes, profileRes]] = await Promise.all([
                 apiPromise,
                 dbPromises
             ]);
@@ -145,6 +154,15 @@ export default function NativeOrdla() {
             setGuesses([]);
             setCurrentGuess('');
             
+            const userIsSubscribed = !!profileRes?.data?.is_subscribed;
+            if (user) setIsSubscribed(userIsSubscribed);
+            else setIsSubscribed(false);
+
+            if (length > 5 && (!user || !userIsSubscribed)) {
+                setGameState('error');
+                return;
+            }
+
             if (!user) { setGameState('playing'); return; }
 
             const existingState = stateRes.data;
@@ -469,7 +487,10 @@ export default function NativeOrdla() {
                                             onPress={() => handleWordLengthChange(len)} 
                                             className={`px-5 py-2.5 rounded-full ${wordLength === len ? 'bg-white shadow-sm border border-gray-100' : ''}`}
                                         >
-                                            <Text className={`font-bold text-sm ${wordLength === len ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>{len} stafir</Text>
+                                            <View className="flex-row items-center justify-center gap-1.5">
+                                                <Text className={`font-bold text-sm ${wordLength === len ? 'text-[#1A1A1B]' : 'text-gray-500'}`}>{len} stafir</Text>
+                                                {len > 5 && isSubscribed !== true && <Ionicons name="lock-closed" size={14} color="#9ca3af" />}
+                                            </View>
                                         </Pressable>
                                     ))}
                                 </View>

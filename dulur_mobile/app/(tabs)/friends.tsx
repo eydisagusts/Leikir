@@ -559,7 +559,7 @@ export default function FriendsScreen() {
                                                 <Text className="font-bold text-lg text-[#1e1b4b] mb-1">{g.name}</Text>
                                                 {!canPlay && <Ionicons name="lock-closed" size={14} color="#94a3b8" style={{ marginLeft: 4, marginBottom: 4 }} /> }
                                             </View>
-                                            {!canPlay && <Text className="text-[10px] uppercase font-bold text-slate-400">Krefst Áskriftar</Text>}
+                                            {!canPlay && <Text className="text-[10px] font-bold text-slate-400">KREFST ÁSKRIFTAR</Text>}
                                             {isIssuingChallenge === g.id && <ActivityIndicator size="small" color="#1e1b4b" className="mt-2" />}
                                         </TouchableOpacity>
                                     )

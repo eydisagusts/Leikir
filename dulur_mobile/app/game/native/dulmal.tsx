@@ -41,9 +41,14 @@ export default function NativeDulmal() {
         setGameState('loading');
         try {
             const today = date || new Date().toISOString().split('T')[0];
-            const sessionPromise = supabase.auth.getSession();
-            
-            const res = await fetch(`${API_URL}/api/mobile/dulmal/init?d=${today}${challengeId ? `&c=${challengeId}` : ''}`);
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`${API_URL}/api/mobile/dulmal/init?d=${today}${challengeId ? `&c=${challengeId}` : ''}`, {
+                headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'Failed to load game');
+            }
             const data = await res.json();
             const puzzle = data.puzzleData;
             
@@ -51,7 +56,6 @@ export default function NativeDulmal() {
             
             setPuzzleData(puzzle);
 
-            const { data: { session } } = await sessionPromise;
             const user = session?.user;
 
             const isToday = today === new Date().toISOString().split('T')[0];
@@ -73,8 +77,8 @@ export default function NativeDulmal() {
 
             let tempGuesses: Record<number, string> = {};
             let index = 0;
-            puzzle.words.forEach(word => {
-                word.forEach(char => {
+            puzzle.words.forEach((word: string[]) => {
+                word.forEach((char: string) => {
                     if (/[0-9]+/.test(char)) {
                         if (resultRes.data?.won) {
                             tempGuesses[index] = puzzle.decryption[char];
@@ -301,10 +305,10 @@ export default function NativeDulmal() {
                     <View className="flex-1 items-center justify-center p-6 text-center min-h-[300px]">
                         <View className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 items-center w-full max-w-sm">
                             <Ionicons name="lock-closed" size={48} color="#eb3b5a" style={{ marginBottom: 16 }} />
-                            <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Villa kom upp</Text>
-                            <Text className="text-sm font-medium text-slate-500 mb-2 text-center">{errorMsg || 'Vinsamlegast reyndu aftur síðar.'}</Text>
+                            <Text className="text-2xl font-black font-serif text-[#1A1A1B] mb-2 text-center">Aðgangur Lokaður</Text>
+                            <Text className="text-sm font-medium text-slate-500 mb-2 text-center leading-6">{errorMsg || 'Þessi leikur krefst Dulur+ áskriftar eða netþjónn niðri.'}</Text>
                             <TouchableOpacity onPress={() => router.back()} className="bg-[#1A1A1B] w-full py-4 rounded-full shadow-md items-center mt-6">
-                                <Text className="text-white font-bold text-lg">Til baka</Text>
+                                <Text className="text-white font-bold text-lg">Til baka í Leiki</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -415,7 +419,7 @@ export default function NativeDulmal() {
                         <NativeGameEndModal
                             gameTitle="Dulmál"
                             visible={(gameState === 'won' || gameState === 'lost') && isFreshGameOver}
-                            gameState={gameState}
+                            gameState={gameState as 'won' | 'lost'}
                             xpEarned={earnedXp}
                             winTitle="Vel afkóðað!"
                             winDesc="Þú leystir dulmálið."

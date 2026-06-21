@@ -125,10 +125,16 @@ export default function NativeStafarugl() {
             try {
                 const today = date || new Date().toISOString().split('T')[0];
 
-                const sessionPromise = supabase.auth.getSession();
-                const apiPromise = fetch(`${API_URL}/api/mobile/stafarugl/init?date=${today}`).then(res => res.json());
-
-                const { data: { session } } = await sessionPromise;
+                const { data: { session } } = await supabase.auth.getSession();
+                const apiPromise = fetch(`${API_URL}/api/mobile/stafarugl/init?date=${today}`, {
+                    headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : undefined
+                }).then(async res => {
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || 'Failed to load game');
+                    }
+                    return res.json();
+                });
                 const user = session?.user;
 
                 const isToday = today === new Date().toISOString().split('T')[0];
